@@ -1,0 +1,76 @@
+{
+  "name": "wealtheon",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "NODE_OPTIONS='--max-old-space-size=4096' next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vladimirdd96/wealtheon.git"
+  },
+  "keywords": [
+    "AI",
+    "crypto",
+    "investment",
+    "NFT",
+    "DeFi",
+    "blockchain",
+    "Solana"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/vladimirdd96/wealtheon/issues"
+  },
+  "homepage": "https://github.com/vladimirdd96/wealtheon#readme",
+  "description": "AI-powered investment platform providing personalized advice and market forecasts for crypto, NFTs, and DeFi.",
+  "dependencies": {
+    "@heroicons/react": "^2.2.0",
+    "@moralisweb3/common-sol-utils": "^2.27.2",
+    "@moralisweb3/next": "^2.27.2",
+    "@noble/ed25519": "^2.2.3",
+    "@radix-ui/react-slot": "^1.1.2",
+    "@solana/wallet-adapter-base": "^0.9.24",
+    "@solana/wallet-adapter-react": "^0.15.36",
+    "@solana/wallet-adapter-react-ui": "^0.9.36",
+    "@solana/wallet-adapter-wallets": "^0.19.33",
+    "@solana/web3.js": "^1.98.0",
+    "@supabase/ssr": "^0.6.1",
+    "@supabase/supabase-js": "^2.49.4",
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.1",
+    "bs58": "^5.0.0",
+    "clsx": "^2.1.1",
+    "eslint": "^9.24.0",
+    "framer-motion": "^12.6.3",
+    "moralis": "^2.27.2",
+    "next": "^15.2.4",
+    "next-auth": "^4.24.7",
+    "openai": "^4.91.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "recharts": "^2.15.2",
+    "simplex-noise": "^4.0.3",
+    "tailwind-merge": "^3.1.0",
+    "typescript": "^5.8.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss7-compat": "^2.2.17",
+    "@typescript-eslint/eslint-plugin": "^8.29.0",
+    "@typescript-eslint/parser": "^8.29.0",
+    "autoprefixer": "^10.4.21",
+    "critters": "^0.0.23",
+    "css-loader": "^7.1.2",
+    "eslint-config-next": "15.2.4",
+    "postcss": "^8.5.3",
+    "postcss-import": "^16.1.0",
+    "postcss-preset-env": "^10.1.5",
+    "style-loader": "^4.0.0",
+    "tailwindcss": "^4.1.3"
+  }
+}
