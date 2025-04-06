@@ -9,30 +9,54 @@ import {
 } from "@heroicons/react/24/outline";
 import dynamic from "next/dynamic";
 
-// Dynamically import components to prevent loading errors
-const PersonalizedPortfolio = dynamic(() => import("../../components/dashboard/PersonalizedPortfolio"), {
-  loading: () => <div className="p-8 flex justify-center items-center min-h-[500px]">
-    <div className="text-white text-lg">Loading Portfolio Advisor...</div>
-  </div>
-});
+// Import components directly
+import PersonalizedPortfolioComponent from "../../components/dashboard/PersonalizedPortfolio";
+import MarketPredictionsComponent from "../../components/dashboard/MarketPredictions";
+import DeFiInsightsComponent from "../../components/dashboard/DeFiInsights";
+import NFTAdvisorComponent from "../../components/dashboard/NFTAdvisor";
 
-const MarketPredictions = dynamic(() => import("../../components/dashboard/MarketPredictions"), {
-  loading: () => <div className="p-8 flex justify-center items-center min-h-[500px]">
-    <div className="text-white text-lg">Loading Market Predictions...</div>
-  </div>
-});
+// Create client-side only versions with proper loading states
+const PersonalizedPortfolio = dynamic(
+  () => Promise.resolve(PersonalizedPortfolioComponent),
+  {
+    loading: () => <div className="p-8 flex justify-center items-center min-h-[500px]">
+      <div className="text-white text-lg">Loading Portfolio Advisor...</div>
+    </div>
+  }
+);
 
-const DeFiInsights = dynamic(() => import("../../components/dashboard/DeFiInsights"), {
-  loading: () => <div className="p-8 flex justify-center items-center min-h-[500px]">
-    <div className="text-white text-lg">Loading DeFi Insights...</div>
-  </div>
-});
+const MarketPredictions = dynamic(
+  () => Promise.resolve(MarketPredictionsComponent),
+  {
+    loading: () => <div className="p-8 flex justify-center items-center min-h-[500px]">
+      <div className="text-white text-lg">Loading Market Predictions...</div>
+    </div>
+  }
+);
 
-const NFTAdvisor = dynamic(() => import("../../components/dashboard/NFTAdvisor"), {
-  loading: () => <div className="p-8 flex justify-center items-center min-h-[500px]">
-    <div className="text-white text-lg">Loading NFT Advisor...</div>
-  </div>
-});
+const DeFiInsights = dynamic(
+  () => Promise.resolve(DeFiInsightsComponent),
+  {
+    loading: () => <div className="p-8 flex justify-center items-center min-h-[500px]">
+      <div className="text-white text-lg">Loading DeFi Insights...</div>
+    </div>
+  }
+);
+
+const NFTAdvisor = dynamic(
+  () => Promise.resolve(NFTAdvisorComponent),
+  {
+    loading: () => <div className="p-8 flex justify-center items-center min-h-[500px]">
+      <div className="text-white text-lg">Loading NFT Advisor...</div>
+    </div>
+  }
+);
+
+// Add display names for dynamic components
+PersonalizedPortfolio.displayName = 'PersonalizedPortfolio';
+MarketPredictions.displayName = 'MarketPredictions';
+DeFiInsights.displayName = 'DeFiInsights';
+NFTAdvisor.displayName = 'NFTAdvisor';
 
 const tabs = [
   {

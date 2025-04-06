@@ -6,47 +6,46 @@ import { useConnection } from '@solana/wallet-adapter-react';
 import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { StaticWalletButton } from './WalletButton';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 
 // Import wallet adapter CSS directly
 import '@solana/wallet-adapter-react-ui/styles.css';
 
-// Dynamic import for the wallet modal hook
-const WalletModalHookProvider = dynamic(
-  () => import('@solana/wallet-adapter-react-ui').then((mod) => {
-    const { useWalletModal } = mod;
+// Create a client-side only button component 
+const WalletModalButton = dynamic(
+  () => Promise.resolve(({ className }: { className?: string }) => {
+    const { setVisible } = useWalletModal();
+    const { publicKey, connected, disconnect } = useWallet();
     
-    // Custom hook component to access the modal
-    return function WalletModalButton({ className }: { className?: string }) {
-      const { setVisible } = useWalletModal();
-      const { publicKey, connected, disconnect } = useWallet();
-      
-      const openModal = () => {
-        setVisible(true);
-      };
+    const openModal = () => {
+      setVisible(true);
+    };
 
-      if (!connected) {
-        return (
-          <button 
-            onClick={openModal}
-            className={`bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-medium py-2 px-4 rounded-lg text-sm transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-purple-500/20 ${className || ''}`}
-          >
-            Connect Wallet
-          </button>
-        );
-      }
-
+    if (!connected) {
       return (
         <button 
-          onClick={disconnect}
+          onClick={openModal}
           className={`bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-medium py-2 px-4 rounded-lg text-sm transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-purple-500/20 ${className || ''}`}
         >
-          Disconnect
+          Connect Wallet
         </button>
       );
-    };
+    }
+
+    return (
+      <button 
+        onClick={disconnect}
+        className={`bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-medium py-2 px-4 rounded-lg text-sm transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-purple-500/20 ${className || ''}`}
+      >
+        Disconnect
+      </button>
+    );
   }),
   { ssr: false, loading: () => <StaticWalletButton /> }
 );
+
+// Set display name for the component
+WalletModalButton.displayName = 'WalletModalButton';
 
 export const WalletConnectButton: FC = () => {
   const { publicKey, connected } = useWallet();
@@ -103,7 +102,7 @@ export const WalletConnectButton: FC = () => {
 
   return (
     <div className="flex flex-col items-end">
-      <WalletModalHookProvider />
+      <WalletModalButton />
       
       {connected && balance !== null && (
         <div className="text-xs mt-1 text-gray-300">

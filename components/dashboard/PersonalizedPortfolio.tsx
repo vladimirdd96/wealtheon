@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { 
   LineChart, Line, PieChart, Pie, Cell, 
   ResponsiveContainer, Tooltip, Legend, BarChart, Bar, 
@@ -55,14 +55,24 @@ export default function PersonalizedPortfolio() {
   const [selectedRiskProfile, setSelectedRiskProfile] = useState<keyof typeof riskProfiles>("moderate");
   const [portfolioData, setPortfolioData] = useState<any | null>(null);
   
-  // Automatically connect wallet and fetch data when component mounts
-  useEffect(() => {
-    // Auto-connect wallet on load
-    autoConnectWallet();
-  }, []);
-
-  // Auto-connect wallet function
-  const autoConnectWallet = async () => {
+  // Fetch portfolio data (declaration moved up)
+  const fetchPortfolioData = async (address: string) => {
+    setLoading(true);
+    
+    try {
+      // Generate mock portfolio data for demo
+      const mockPortfolioData = generateMockPortfolioData();
+      setPortfolioData(mockPortfolioData);
+    } catch (err) {
+      console.error("Failed to fetch portfolio data:", err);
+      setError("Failed to load your portfolio data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Auto-connect wallet function (declared before useEffect call)
+  const autoConnectWallet = useCallback(async () => {
     setLoading(true);
     
     try {
@@ -84,7 +94,13 @@ export default function PersonalizedPortfolio() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchPortfolioData]);
+  
+  // Automatically connect wallet and fetch data when component mounts (moved after autoConnectWallet)
+  useEffect(() => {
+    // Auto-connect wallet on load
+    autoConnectWallet();
+  }, [autoConnectWallet]);
   
   // Connect wallet function (for manual connection)
   const connectWallet = async () => {
@@ -105,22 +121,6 @@ export default function PersonalizedPortfolio() {
     } catch (err) {
       console.error("Failed to connect wallet:", err);
       setError("Failed to connect your wallet. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Fetch portfolio data
-  const fetchPortfolioData = async (address: string) => {
-    setLoading(true);
-    
-    try {
-      // Generate mock portfolio data for demo
-      const mockPortfolioData = generateMockPortfolioData();
-      setPortfolioData(mockPortfolioData);
-    } catch (err) {
-      console.error("Failed to fetch portfolio data:", err);
-      setError("Failed to load your portfolio data. Please try again.");
     } finally {
       setLoading(false);
     }

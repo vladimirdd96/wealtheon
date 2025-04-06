@@ -127,7 +127,7 @@ export default function MarketPredictions() {
   // Fetch market data on component mount or when filters change
   useEffect(() => {
     fetchMarketData();
-  }, [selectedAsset, selectedTimePeriod]);
+  }, [selectedAsset, selectedTimePeriod, fetchMarketData]);
   
   // Generate price predictions based on real data
   const generatePricePredictions = (priceData: any[]) => {

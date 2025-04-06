@@ -7,6 +7,11 @@
   "plugins": ["@typescript-eslint"],
   "rules": {
     "@typescript-eslint/no-unused-vars": "warn",
-    "@typescript-eslint/no-explicit-any": "warn"
+    "@typescript-eslint/no-explicit-any": "warn",
+    "react-hooks/exhaustive-deps": "warn",
+    "prefer-const": "warn",
+    "no-var": "error",
+    "@next/next/no-html-link-for-pages": "warn",
+    "react/display-name": "warn"
   }
 }

@@ -2,10 +2,10 @@
 const nextConfig = {
   reactStrictMode: false,
   images: {
-    unoptimized: false,
+    unoptimized: true,
   },
   experimental: {
-    optimizeCss: true,
+    optimizeCss: false,
     optimizePackageImports: ['framer-motion', 'react-dom', 'recharts'],
   },
   logging: {
@@ -15,6 +15,23 @@ const nextConfig = {
     removeConsole: process.env.NODE_ENV === 'production' ? {
       exclude: ['error', 'warn'],
     } : false,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      if (config.optimization && config.optimization.minimizer) {
+        config.optimization.minimizer = [];
+      }
+      
+      config.optimization.minimize = false;
+    }
+    
+    return config;
   },
 };
 

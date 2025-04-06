@@ -3,15 +3,20 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import dynamic from 'next/dynamic';
 import { StaticWalletButton } from "./WalletButton";
+import Link from 'next/link';
+import { WalletConnectButton } from './WalletConnectButton';
 
-// Dynamically import the WalletConnectButton with SSR disabled
-const WalletConnectButtonDynamic = dynamic(
-  () => import('./WalletConnectButton').then(mod => mod.WalletConnectButton),
+// Create a client-side only wrapper for the WalletConnectButton
+const ClientWalletButton = dynamic(
+  () => Promise.resolve(WalletConnectButton),
   { 
     ssr: false,
     loading: () => <StaticWalletButton />
   }
 );
+
+// Add display name
+ClientWalletButton.displayName = 'ClientWalletButton';
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -49,29 +54,29 @@ export function Navbar() {
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <div className="flex-shrink-0 flex items-center">
-            <a className="text-xl font-bold text-white" href="/">
+            <Link className="text-xl font-bold text-white" href="/">
               WEALTHEON
-            </a>
+            </Link>
           </div>
 
           {/* Desktop Navigation */}
           <div className="hidden md:block">
             <div className="ml-10 flex items-center space-x-8">
               {["Dashboard", "Analytics", "Pricing", "FAQ"].map((item) => (
-                <a
+                <Link
                   key={item}
                   href={`/${item.toLowerCase()}`}
                   className="text-gray-300 hover:text-white transition-colors duration-300"
                 >
                   {item}
-                </a>
+                </Link>
               ))}
             </div>
           </div>
 
           {/* Connect Button */}
           <div>
-            {mounted ? <WalletConnectButtonDynamic /> : <StaticWalletButton />}
+            {mounted ? <ClientWalletButton /> : <StaticWalletButton />}
           </div>
 
           {/* Mobile menu button */}

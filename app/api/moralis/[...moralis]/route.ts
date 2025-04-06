@@ -8,9 +8,13 @@ if (!Moralis.Core.isStarted) {
   });
 }
 
+interface PageParams {
+  moralis: string[];
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { moralis: string[] } }
+  { params }: { params: PageParams }
 ) {
   try {
     const { searchParams } = new URL(request.url);
@@ -37,7 +41,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { moralis: string[] } }
+  { params }: { params: PageParams }
 ) {
   try {
     const path = params.moralis.join('/');
@@ -62,4 +66,4 @@ export async function POST(
       headers: { 'Content-Type': 'application/json' },
     });
   }
-} 
+}

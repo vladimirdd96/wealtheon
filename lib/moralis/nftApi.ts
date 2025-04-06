@@ -162,7 +162,7 @@ export async function searchNFTs({
 
     // Normalize the data to match our NFT interface
     const nfts: NFT[] = data.result.map((nft: any) => {
-      let metadata = nft.metadata ? 
+      const metadata = nft.metadata ? 
         (typeof nft.metadata === 'string' ? JSON.parse(nft.metadata) : nft.metadata) : 
         null;
       
@@ -225,7 +225,7 @@ export async function getNFTDetails({
     const nft = await response.json();
     
     // Parse metadata if it's a string
-    let metadata = nft.metadata ? 
+    const metadata = nft.metadata ? 
       (typeof nft.metadata === 'string' ? JSON.parse(nft.metadata) : nft.metadata) : 
       null;
     
