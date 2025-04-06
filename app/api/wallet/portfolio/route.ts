@@ -7,9 +7,13 @@ const initMoralis = async () => {
   if (!process.env.NEXT_PUBLIC_MORALIS_API_KEY) {
     throw new Error('Moralis API key not found');
   }
-  await Moralis.start({
-    apiKey: process.env.NEXT_PUBLIC_MORALIS_API_KEY,
-  });
+  
+  // Check if Moralis is already initialized before trying to start it
+  if (!Moralis.Core.isStarted) {
+    await Moralis.start({
+      apiKey: process.env.NEXT_PUBLIC_MORALIS_API_KEY,
+    });
+  }
 };
 
 export async function GET(request: NextRequest) {

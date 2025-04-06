@@ -68,16 +68,18 @@ export async function getSolanaTokens(address: string) {
 // Function to fetch portfolio value (requires price data)
 export async function getSolanaPortfolioValue(address: string) {
   try {
-    // Get token balances
-    const tokens = await getSolanaTokens(address);
+    const baseUrl = getBaseUrl();
     
-    // Get token prices (this would need to be implemented based on Moralis API capabilities)
-    // For now, we return a basic structure
-    return {
-      address,
-      tokens: tokens.tokens || [],
-      totalValue: 0, // This would be calculated with price data
-    };
+    // Get the portfolio endpoint from Moralis
+    const response = await fetch(`${baseUrl}/api/moralis/account/${address}/portfolio?network=mainnet&chain=solana`);
+    
+    if (!response.ok) {
+      console.error(`Failed to fetch portfolio: ${response.status}`);
+      throw new Error('Failed to fetch portfolio data');
+    }
+    
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error('Error fetching Solana portfolio value:', error);
     throw error;

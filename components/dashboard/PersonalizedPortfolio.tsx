@@ -6,8 +6,10 @@ import {
   ResponsiveContainer, Tooltip, Legend, BarChart, Bar, 
   XAxis, YAxis, CartesianGrid
 } from "recharts";
+import { useWalletStore } from "@/store/walletStore";
+import { usePortfolioStore } from "@/store/portfolioStore";
 
-// Mock data for portfolio analysis
+// Define colors for visualization
 const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#0088fe"];
 
 // Define risk profiles with asset allocations
@@ -48,62 +50,24 @@ const riskProfiles = {
 };
 
 export default function PersonalizedPortfolio() {
-  const [loading, setLoading] = useState(false);
+  // Local state
   const [error, setError] = useState<string | null>(null);
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [selectedRiskProfile, setSelectedRiskProfile] = useState<keyof typeof riskProfiles>("moderate");
-  const [portfolioData, setPortfolioData] = useState<any | null>(null);
   
-  // Fetch portfolio data from connected wallet
-  const fetchPortfolioData = async (address: string) => {
-    // Only set loading if we don't already have data
-    if (!portfolioData) {
-      setLoading(true);
-    }
-    
-    try {
-      // Create API endpoint for fetching wallet data
-      const walletDataEndpoint = `/api/wallet/portfolio?address=${address}`;
-      
-      // Try to fetch real wallet data
-      try {
-        const response = await fetch(walletDataEndpoint);
-        
-        if (response.ok) {
-          const realWalletData = await response.json();
-          
-          // If we got real data, use it
-          if (realWalletData && !realWalletData.error) {
-            console.log("Using real wallet data:", realWalletData);
-            setPortfolioData(realWalletData);
-            return;
-          }
-        }
-      } catch (walletError) {
-        console.error("Error fetching real wallet data:", walletError);
-        // Continue to fallback if real data fetch fails
-      }
-      
-      // Fallback: Generate portfolio data using market data
-      console.log("Using generated portfolio data for address:", address);
-      const generatedData = await generatePortfolioData();
-      setPortfolioData(generatedData);
-    } catch (err) {
-      console.error("Failed to fetch portfolio data:", err);
-      setError("Failed to load your portfolio data. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Global state from Zustand stores
+  const { connected, publicKey, setConnected, setPublicKey } = useWalletStore();
+  const { 
+    data: portfolioData, 
+    isLoading, 
+    error: portfolioError, 
+    fetchPortfolioData,
+    clearError 
+  } = usePortfolioStore();
   
   // Auto-connect wallet function (declared before useEffect call)
   const autoConnectWallet = useCallback(async () => {
-    // Don't set loading if we already have portfolioData to prevent UI flashing
-    if (!portfolioData) {
-      setLoading(true);
-    }
-    
     try {
       // Check if wallet is already connected via browser extension
       const phantomWallet = (window as any)?.phantom?.solana;
@@ -125,21 +89,20 @@ export default function PersonalizedPortfolio() {
       setWalletAddress(walletAddress);
       setWalletConnected(true);
       
-      // Use a separate loading indicator for data fetching
-      if (!portfolioData) {
-        // Fetch real portfolio data with the wallet address
-        await fetchPortfolioData(walletAddress);
-      }
+      // Update global wallet store
+      setConnected(true);
+      setPublicKey(walletAddress);
+      
+      // Fetch real portfolio data with the wallet address
+      await fetchPortfolioData(walletAddress);
     } catch (err) {
       console.error("Failed to auto-connect wallet:", err);
       // Don't show an error for auto-connect failures
       // User can still manually connect
-    } finally {
-      setLoading(false);
     }
-  }, [portfolioData]);
+  }, [setConnected, setPublicKey, fetchPortfolioData]);
   
-  // Automatically connect wallet and fetch data when component mounts (moved after autoConnectWallet)
+  // Automatically connect wallet and fetch data when component mounts
   useEffect(() => {
     // Auto-connect wallet on load - add a slight delay to ensure smooth mounting
     const timer = setTimeout(() => {
@@ -149,10 +112,17 @@ export default function PersonalizedPortfolio() {
     return () => clearTimeout(timer);
   }, [autoConnectWallet]);
   
+  // Also fetch data if we have a public key but no data
+  useEffect(() => {
+    if (publicKey && !portfolioData && !isLoading) {
+      fetchPortfolioData(publicKey);
+    }
+  }, [publicKey, portfolioData, isLoading, fetchPortfolioData]);
+  
   // Connect wallet function (for manual connection)
   const connectWallet = async () => {
-    setLoading(true);
     setError(null);
+    clearError();
     
     try {
       // Try to use actual wallet adapters if available
@@ -190,196 +160,16 @@ export default function PersonalizedPortfolio() {
       setWalletAddress(walletAddress);
       setWalletConnected(true);
       
+      // Update global wallet store
+      setConnected(true);
+      setPublicKey(walletAddress);
+      
       // Then fetch portfolio data
-      await fetchPortfolioData(walletAddress);
+      await fetchPortfolioData(walletAddress, true); // Force refresh
     } catch (err) {
       console.error("Failed to connect wallet:", err);
       setError("Failed to connect your wallet. Please try again.");
-    } finally {
-      setLoading(false);
     }
-  };
-  
-  // Generate portfolio data using real market data
-  const generatePortfolioData = async () => {
-    try {
-      // Fetch real market data from CoinGecko
-      const response = await fetch(
-        'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,solana,usd-coin,aave,uniswap&price_change_percentage=30d'
-      );
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch cryptocurrency market data');
-      }
-      
-      const marketData = await response.json();
-      
-      // Create allocation based on real market data
-      // We're simulating a portfolio allocation here, but using real tokens
-      const currentAllocation = [
-        { name: "Stablecoins", value: 30, color: "#8884d8" }, // Based on USDC, DAI, etc.
-        { name: "Major Cryptos", value: 35, color: "#82ca9d" }, // Based on BTC, ETH
-        { name: "DeFi Tokens", value: 20, color: "#ffc658" }, // Based on AAVE, UNI
-        { name: "Solana Ecosystem", value: 10, color: "#ff8042" }, // Based on SOL
-        { name: "Cash", value: 5, color: "#0088fe" } // Fiat reserve
-      ];
-      
-      // Get historical price data for portfolio history
-      const today = new Date();
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(today.getMonth() - 6);
-      
-      const btcHistoryResponse = await fetch(
-        `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range?vs_currency=usd&from=${Math.floor(sixMonthsAgo.getTime()/1000)}&to=${Math.floor(today.getTime()/1000)}`
-      );
-      
-      if (!btcHistoryResponse.ok) {
-        throw new Error('Failed to fetch historical price data');
-      }
-      
-      const btcHistoryData = await btcHistoryResponse.json();
-      
-      // Process the historical data into monthly data points
-      const monthlyPrices = processHistoricalDataToMonthly(btcHistoryData.prices);
-      
-      // Create portfolio history based on actual Bitcoin performance
-      // Using Bitcoin as a benchmark and applying some portfolio-specific adjustments
-      const portfolioHistory = monthlyPrices.map(point => ({
-        name: new Date(point.timestamp).toLocaleString('default', { month: 'short' }),
-        value: calculatePortfolioValue(point.price, currentAllocation)
-      }));
-      
-      // Get asset performance from real market data
-      const assetPerformance = marketData.map((coin: any) => ({
-        name: coin.symbol.toUpperCase(),
-        performance: coin.price_change_percentage_30d_in_currency !== null ? 
-          parseFloat(coin.price_change_percentage_30d_in_currency.toFixed(1)) :
-          parseFloat((Math.random() * 20 - 10).toFixed(1)) // Fallback if API doesn't provide data
-      }));
-      
-      // Calculate portfolio risk score based on allocation and market volatility
-      // Higher weight in volatile assets = higher risk score
-      const riskScore = calculateRiskScore(currentAllocation, assetPerformance);
-      
-      return {
-        totalValue: portfolioHistory[portfolioHistory.length - 1].value,
-        currentAllocation,
-        portfolioHistory,
-        assetPerformance,
-        riskScore
-      };
-    } catch (error) {
-      console.error('Error generating portfolio data:', error);
-      // Provide a minimal fallback in case of API failure
-      return {
-        totalValue: 15000,
-        currentAllocation: [
-          { name: "Stablecoins", value: 30, color: "#8884d8" },
-          { name: "Major Cryptos", value: 35, color: "#82ca9d" },
-          { name: "DeFi Tokens", value: 20, color: "#ffc658" },
-          { name: "Solana Ecosystem", value: 10, color: "#ff8042" },
-          { name: "Cash", value: 5, color: "#0088fe" }
-        ],
-        portfolioHistory: [
-          { name: "Jan", value: 10000 },
-          { name: "Feb", value: 11000 },
-          { name: "Mar", value: 10500 },
-          { name: "Apr", value: 12000 },
-          { name: "May", value: 14000 },
-          { name: "Jun", value: 15000 }
-        ],
-        assetPerformance: [
-          { name: "BTC", performance: 5.2 },
-          { name: "ETH", performance: 3.8 },
-          { name: "SOL", performance: 7.5 },
-          { name: "USDC", performance: 0.1 },
-          { name: "AAVE", performance: -2.3 },
-          { name: "UNI", performance: 1.4 }
-        ],
-        riskScore: 60
-      };
-    }
-  };
-  
-  // Process historical price data to get monthly data points
-  const processHistoricalDataToMonthly = (priceData: [number, number][]) => {
-    const monthlyData: { timestamp: number; price: number }[] = [];
-    const months: { [key: string]: { timestamp: number; price: number } } = {};
-    
-    // Group by month
-    priceData.forEach(([timestamp, price]) => {
-      const date = new Date(timestamp);
-      const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
-      
-      if (!months[monthKey] || date.getDate() === 15) { // Use mid-month price
-        months[monthKey] = { timestamp, price };
-      }
-    });
-    
-    // Convert to array and sort
-    Object.values(months).forEach(data => {
-      monthlyData.push(data);
-    });
-    
-    // Sort by timestamp
-    monthlyData.sort((a, b) => a.timestamp - b.timestamp);
-    
-    // Take the most recent 6 months (or whatever is available)
-    return monthlyData.slice(-6);
-  };
-  
-  // Calculate a portfolio value based on BTC price and allocation
-  const calculatePortfolioValue = (btcPrice: number, allocation: { name: string; value: number }[]) => {
-    // Use BTC price as a base multiplier (assuming $10 BTC would be a $10,000 portfolio)
-    const baseValue = btcPrice * 200;
-    
-    // Apply allocation-specific adjustments
-    // Stablecoins are more stable, Major Cryptos fluctuate more, etc.
-    const stableAllocation = allocation.find(a => a.name === "Stablecoins")?.value || 0;
-    const majorCryptoAllocation = allocation.find(a => a.name === "Major Cryptos")?.value || 0;
-    
-    // More stablecoins = less volatility, more major cryptos = more upside
-    const stabilityFactor = 1 - (stableAllocation / 100) * 0.5;
-    const growthFactor = 1 + (majorCryptoAllocation / 100) * 0.3;
-    
-    return Math.round(baseValue * stabilityFactor * growthFactor);
-  };
-  
-  // Calculate risk score based on allocation and market volatility
-  const calculateRiskScore = (
-    allocation: { name: string; value: number }[], 
-    performance: { name: string; performance: number }[]
-  ) => {
-    // Calculate average absolute performance (volatility)
-    const avgVolatility = performance.reduce((sum, asset) => sum + Math.abs(asset.performance), 0) / performance.length;
-    
-    // Calculate risk factors for each allocation category
-    const riskFactors = {
-      "Stablecoins": 20, // Low risk
-      "Major Cryptos": 60, // Medium risk
-      "DeFi Tokens": 80, // High risk
-      "Solana Ecosystem": 75, // High risk
-      "NFTs": 90, // Very high risk
-      "Cash": 10 // Very low risk
-    };
-    
-    // Calculate weighted risk score
-    let weightedRiskScore = 0;
-    let totalWeight = 0;
-    
-    allocation.forEach(asset => {
-      const riskFactor = riskFactors[asset.name as keyof typeof riskFactors] || 50;
-      weightedRiskScore += asset.value * riskFactor;
-      totalWeight += asset.value;
-    });
-    
-    // Normalize to 0-100 scale
-    const baseRiskScore = totalWeight > 0 ? weightedRiskScore / totalWeight : 50;
-    
-    // Adjust by market volatility
-    const volatilityAdjustment = (avgVolatility - 5) * 2; // Normalize around 5% monthly change
-    
-    return Math.min(Math.max(Math.round(baseRiskScore + volatilityAdjustment), 10), 90);
   };
   
   // Format currency values
@@ -387,136 +177,176 @@ export default function PersonalizedPortfolio() {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(value);
   };
   
-  // Generate recommendations based on selected risk profile and current allocation
+  // Get portfolio recommendations based on current allocation and risk profile
   const getRecommendations = () => {
     if (!portfolioData) return [];
     
-    const targetAllocation = riskProfiles[selectedRiskProfile].allocation;
+    // Use the stored data to provide recommendations
     const currentAllocation = portfolioData.currentAllocation;
     
-    // Compare current allocation with target for the selected risk profile
-    const recommendations = [];
+    // Identify most concentrated asset
+    let mostConcentrated = { name: '', value: 0 };
+    let lowDiversification = false;
+    
+    currentAllocation.forEach(asset => {
+      if (asset.value > mostConcentrated.value) {
+        mostConcentrated = asset;
+      }
+      
+      // Consider anything over 50% to be highly concentrated
+      if (asset.value > 50) {
+        lowDiversification = true;
+      }
+    });
+    
+    // Risk profile target allocation
+    const targetAllocation = riskProfiles[selectedRiskProfile].allocation;
+    
+    // Find major differences between current allocation and target
+    const differences = [];
     
     for (const target of targetAllocation) {
-      const current = currentAllocation.find((item: { name: string; value: number }) => item.name === target.name);
-      const currentValue = current ? current.value : 0;
-      const difference = target.value - currentValue;
+      const current = currentAllocation.find(asset => asset.name === target.name);
       
-      // Only add recommendations with significant differences
-      if (Math.abs(difference) >= 5) {
-        recommendations.push({
-          asset: target.name,
-          action: difference > 0 ? "Increase" : "Decrease",
-          amount: `${Math.abs(difference)}%`,
-          reason: difference > 0 
-            ? `Your ${target.name} allocation is below the target for your ${riskProfiles[selectedRiskProfile].name} risk profile`
-            : `Your ${target.name} allocation is above the target for your ${riskProfiles[selectedRiskProfile].name} risk profile`
-        });
+      if (current) {
+        const diff = target.value - current.value;
+        
+        // If difference is significant (more than 10%)
+        if (Math.abs(diff) > 10) {
+          differences.push({
+            asset: target.name,
+            current: current.value,
+            target: target.value,
+            diff
+          });
+        }
       }
     }
     
-    // Add general risk profile recommendation if we have few asset-specific ones
-    if (recommendations.length < 2) {
+    // Generate recommendations based on findings
+    const recommendations = [];
+    
+    // Recommendation for diversification if needed
+    if (lowDiversification) {
       recommendations.push({
-        asset: "Risk Profile",
-        action: "Review",
-        amount: "N/A",
-        reason: `Consider if the ${riskProfiles[selectedRiskProfile].name} risk profile aligns with your investment goals and time horizon`
+        type: 'warning',
+        title: 'High Concentration Risk',
+        reason: `Your portfolio is heavily concentrated in ${mostConcentrated.name}. Consider diversifying to reduce risk`
       });
     }
     
-    // Add diversification recommendation if heavily concentrated
-    const maxAllocation = Math.max(...currentAllocation.map((a: { value: number }) => a.value));
-    if (maxAllocation > 40) {
-      const concentratedAsset = currentAllocation.find((a: { name: string; value: number }) => a.value === maxAllocation)?.name;
-      recommendations.push({
-        asset: "Diversification",
-        action: "Increase",
-        amount: "N/A",
-        reason: `Your portfolio is heavily concentrated in ${concentratedAsset}. Consider diversifying to reduce risk`
-      });
-    }
+    // Recommendations based on target allocation
+    differences.forEach(diff => {
+      if (diff.diff > 0) {
+        recommendations.push({
+          type: 'suggestion',
+          title: `Increase ${diff.asset} Exposure`,
+          reason: `Consider increasing ${diff.asset} from ${diff.current}% to ${diff.target}% to better align with your ${selectedRiskProfile} risk profile`
+        });
+      } else {
+        recommendations.push({
+          type: 'suggestion',
+          title: `Reduce ${diff.asset} Exposure`,
+          reason: `Consider reducing ${diff.asset} from ${diff.current}% to ${diff.target}% to better align with your ${selectedRiskProfile} risk profile`
+        });
+      }
+    });
     
     return recommendations;
   };
+
+  // Combined loading state
+  const loading = isLoading || (!walletConnected && !error);
   
-  // Loading state
+  // Show loading state
   if (loading) {
     return (
-      <div className="p-8 flex flex-col justify-center items-center min-h-[500px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600 mb-4"></div>
-        <div className="text-white text-lg">
-          {walletConnected ? "Analyzing your portfolio data..." : "Connecting to your wallet..."}
+      <div className="p-8 flex justify-center items-center min-h-[500px]">
+        <div className="text-center">
+          <svg className="animate-spin h-8 w-8 text-violet-500 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <div className="text-white text-lg">
+            {walletConnected ? "Analyzing your portfolio data..." : "Connecting to your wallet..."}
+          </div>
         </div>
-        <div className="text-gray-400 text-sm mt-2">This will only take a moment</div>
       </div>
     );
   }
   
-  // Error state
-  if (error) {
+  // Show error state if needed
+  if (error || portfolioError) {
     return (
-      <div className="p-8 flex flex-col justify-center items-center min-h-[500px]">
-        <div className="text-red-400 text-lg mb-4">{error}</div>
-        <button 
-          onClick={connectWallet}
-          className="px-6 py-3 bg-violet-600 hover:bg-violet-700 rounded-lg font-medium text-white"
-        >
-          Try Again
-        </button>
+      <div className="p-8 flex justify-center items-center min-h-[500px]">
+        <div className="text-center">
+          <div className="bg-red-900/30 text-red-200 p-4 rounded-lg max-w-md mx-auto">
+            <p className="text-lg mb-4">{error || portfolioError}</p>
+            <button
+              onClick={connectWallet}
+              className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
   
-  // Not connected state - should only show briefly before auto-connect
-  if (!walletConnected) {
+  // Show connect wallet UI if no wallet is connected
+  if (!walletConnected || !walletAddress) {
     return (
       <div className="p-8 flex flex-col justify-center items-center min-h-[500px]">
         <div className="text-white text-lg mb-6">Connect your wallet to get personalized portfolio analysis</div>
-        <button 
+        <button
           onClick={connectWallet}
-          className="px-6 py-3 bg-violet-600 hover:bg-violet-700 rounded-lg font-medium text-white"
+          className="px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors flex items-center"
         >
+          <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.414-1.414A1 1 0 0011.586 2H8.414a1 1 0 00-.707.293L6.293 3.707A1 1 0 015.586 4H4zm.5 5a.5.5 0 000 1h11a.5.5 0 000-1h-11z" clipRule="evenodd"></path>
+          </svg>
           Connect Wallet
         </button>
       </div>
     );
   }
-
+  
   // Make sure portfolio data is available
   if (!portfolioData) {
     return (
-      <div className="p-8 flex flex-col justify-center items-center min-h-[500px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600 mb-4"></div>
-        <div className="text-white text-lg">Loading portfolio data...</div>
+      <div className="p-8 flex justify-center items-center min-h-[500px]">
+        <div className="text-center">
+          <svg className="animate-spin h-8 w-8 text-violet-500 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <div className="text-white text-lg">Loading portfolio data...</div>
+        </div>
       </div>
     );
   }
-
+  
+  // Main portfolio UI
   return (
-    <div className="p-6 md:p-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-        <div>
-          <h2 className="text-xl font-semibold text-white">Your Personalized Portfolio</h2>
-          <p className="text-gray-400">Connected: {walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}</p>
-        </div>
-        <div className="mt-3 md:mt-0">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
+      {/* Left Column */}
+      <div>
+        <h2 className="text-xl font-semibold text-white">Your Personalized Portfolio</h2>
+        
+        {/* Portfolio Value */}
+        <div className="bg-gray-800 rounded-lg p-4 mt-4">
           <div className="text-sm text-gray-400 mb-1">Portfolio Value</div>
           <div className="text-2xl font-bold text-white">{formatCurrency(portfolioData.totalValue)}</div>
         </div>
-      </div>
-
-      {/* Portfolio Analysis */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Allocation */}
-        <div className="bg-gray-900/60 rounded-xl p-4">
-          <h3 className="text-lg font-semibold text-white mb-3">Current Allocation</h3>
+        
+        {/* Portfolio Analysis */}
+        <div className="bg-gray-800 rounded-lg p-4 mt-4">
+          <h3 className="text-lg font-semibold text-white mb-3">Asset Allocation</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -529,207 +359,228 @@ export default function PersonalizedPortfolio() {
                   fill="#8884d8"
                   paddingAngle={2}
                   dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   labelLine={false}
+                  isAnimationActive={false}
+                  label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, name, index }) => {
+                    const RADIAN = Math.PI / 180;
+                    const radius = 25 + innerRadius + (outerRadius - innerRadius);
+                    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+                    return (
+                      <text 
+                        x={x} 
+                        y={y} 
+                        fill={COLORS[index % COLORS.length]}
+                        textAnchor={x > cx ? 'start' : 'end'} 
+                        dominantBaseline="central"
+                        fontSize="12"
+                        fontWeight="bold"
+                      >
+                        {`${(percent * 100).toFixed(0)}%`}
+                      </text>
+                    );
+                  }}
                 >
                   {portfolioData.currentAllocation.map((entry: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                    <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  formatter={(value: number) => [`${value}%`, '']}
-                  contentStyle={{ 
-                    backgroundColor: "#1F2937", 
-                    borderColor: "#4B5563",
-                    color: "#F9FAFB"
-                  }}
-                />
+                <Tooltip formatter={(value: number) => `${value}%`} />
               </PieChart>
             </ResponsiveContainer>
           </div>
+          
+          {/* Color-coded legend for easy identification */}
+          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2">
+            {portfolioData.currentAllocation
+              .filter(asset => asset.value > 0)
+              .map((asset, index) => (
+                <div key={index} className="flex items-center">
+                  <div className="w-4 h-4 rounded-full mr-2" style={{backgroundColor: asset.color || COLORS[index % COLORS.length]}}></div>
+                  <span className="text-sm text-gray-300">{asset.name}: <span className="font-medium">{asset.value}%</span></span>
+                </div>
+              ))}
+          </div>
         </div>
-      
+        
         {/* Portfolio History */}
-        <div className="bg-gray-900/60 rounded-xl p-4 lg:col-span-2">
+        <div className="bg-gray-800 rounded-lg p-4 mt-4">
           <h3 className="text-lg font-semibold text-white mb-3">Portfolio History</h3>
-          <div className="h-64">
+          <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={portfolioData.portfolioHistory}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="name" stroke="#9CA3AF" />
-                <YAxis stroke="#9CA3AF" />
+              <LineChart data={portfolioData.portfolioHistory}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                <XAxis dataKey="name" tick={{fill: '#ccc'}} />
+                <YAxis tick={{fill: '#ccc'}} width={80} />
                 <Tooltip 
-                  formatter={(value: number) => [formatCurrency(value), 'Portfolio Value']}
-                  contentStyle={{ 
-                    backgroundColor: "#1F2937", 
-                    borderColor: "#4B5563",
-                    color: "#F9FAFB"
-                  }}
+                  contentStyle={{backgroundColor: '#333', borderColor: '#555'}} 
+                  formatter={(value: number) => [formatCurrency(value), 'Portfolio Value']} 
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="value" 
-                  stroke="#8b5cf6" 
-                  strokeWidth={2}
-                  activeDot={{ r: 8 }} 
-                />
+                <Line type="monotone" dataKey="value" stroke="#8884d8" activeDot={{ r: 8 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
       </div>
-
-      {/* Risk Profile & Recommendations */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Risk Profile Selector */}
-        <div className="lg:col-span-5 bg-gray-900/60 rounded-xl p-4">
-          <h3 className="text-lg font-semibold text-white mb-4">Risk Profile Analysis</h3>
+      
+      {/* Right Column */}
+      <div>
+        {/* Risk Profile */}
+        <div className="bg-gray-800 rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-white mb-3">Risk Assessment</h3>
           
-          {/* Risk score */}
-          <div className="bg-gray-800/50 rounded-lg p-3 mb-4">
+          {/* Risk Score with Gauge */}
+          <div className="mb-4">
             <div className="flex justify-between items-center mb-2">
-              <div className="text-gray-400">Your Risk Score</div>
+              <div className="text-gray-400">Risk Score</div>
               <div className="text-lg font-semibold text-white">{portfolioData.riskScore}/100</div>
             </div>
-            <div className="w-full bg-gray-700 rounded-full h-2">
+            <div className="w-full h-3 bg-gray-700 rounded-full overflow-hidden">
               <div 
-                className={`h-2 rounded-full ${
+                className={
                   portfolioData.riskScore < 40 
-                    ? "bg-green-500" 
+                    ? "h-full bg-green-500" 
                     : portfolioData.riskScore < 70 
-                    ? "bg-yellow-500" 
-                    : "bg-red-500"
-                }`} 
+                      ? "h-full bg-yellow-500"
+                      : "h-full bg-red-500"
+                }
                 style={{ width: `${portfolioData.riskScore}%` }}
               ></div>
             </div>
             <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <div>Conservative</div>
-              <div>Moderate</div>
-              <div>Aggressive</div>
+              <div>Low Risk</div>
+              <div>High Risk</div>
             </div>
           </div>
           
-          {/* Risk profile selector */}
+          {/* Risk Profile Selection */}
           <div className="mb-4">
-            <label className="text-sm text-gray-400 block mb-2">Target Risk Profile</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="text-sm text-gray-400 mb-2">Your Target Risk Profile</div>
+            <div className="flex justify-between space-x-4">
               {Object.keys(riskProfiles).map((profile) => (
                 <button
                   key={profile}
                   onClick={() => setSelectedRiskProfile(profile as keyof typeof riskProfiles)}
-                  className={`py-2 px-3 rounded text-sm transition-colors ${
-                    selectedRiskProfile === profile
-                      ? "bg-violet-600 text-white"
-                      : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                  className={`flex-1 py-2 px-3 rounded text-sm ${
+                    selectedRiskProfile === profile 
+                      ? "bg-violet-600 text-white" 
+                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                   }`}
                 >
                   {riskProfiles[profile as keyof typeof riskProfiles].name}
                 </button>
               ))}
             </div>
+            <div className="text-sm text-gray-400 mt-2">
+              {riskProfiles[selectedRiskProfile].description}
+            </div>
           </div>
           
-          {/* Selected profile allocation */}
-          <div className="bg-gray-800/50 rounded-lg p-3 mb-3">
-            <div className="text-sm text-gray-400 mb-2">Target Allocation</div>
-            <div className="h-48">
+          {/* Target Allocation */}
+          <div className="mt-6">
+            <h4 className="text-md font-medium text-white mb-2">Target Allocation</h4>
+            <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={riskProfiles[selectedRiskProfile].allocation}
                     cx="50%"
                     cy="50%"
-                    innerRadius={50}
-                    outerRadius={70}
+                    innerRadius={60}
+                    outerRadius={80}
                     fill="#8884d8"
                     paddingAngle={2}
                     dataKey="value"
+                    labelLine={false}
+                    isAnimationActive={false}
+                    label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, name, index }) => {
+                      const RADIAN = Math.PI / 180;
+                      const radius = 25 + innerRadius + (outerRadius - innerRadius);
+                      const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                      const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+                      return (
+                        <text 
+                          x={x} 
+                          y={y} 
+                          fill={COLORS[index % COLORS.length]}
+                          textAnchor={x > cx ? 'start' : 'end'} 
+                          dominantBaseline="central"
+                          fontSize="12"
+                          fontWeight="bold"
+                        >
+                          {`${(percent * 100).toFixed(0)}%`}
+                        </text>
+                      );
+                    }}
                   >
-                    {riskProfiles[selectedRiskProfile].allocation.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    {riskProfiles[selectedRiskProfile].allocation.map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip 
-                    formatter={(value: number) => [`${value}%`, '']}
-                    contentStyle={{ 
-                      backgroundColor: "#1F2937", 
-                      borderColor: "#4B5563",
-                      color: "#F9FAFB"
-                    }}
-                  />
-                  <Legend />
+                  <Tooltip formatter={(value: number) => `${value}%`} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-          </div>
-          
-          <div className="text-sm text-gray-400">
-            {riskProfiles[selectedRiskProfile].description}
+            
+            {/* Color-coded legend for target allocation */}
+            <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2">
+              {riskProfiles[selectedRiskProfile].allocation.map((asset, index) => (
+                <div key={index} className="flex items-center">
+                  <div className="w-4 h-4 rounded-full mr-2" style={{backgroundColor: asset.color || COLORS[index % COLORS.length]}}></div>
+                  <span className="text-sm text-gray-300">{asset.name}: <span className="font-medium">{asset.value}%</span></span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
         
-        {/* AI Recommendations */}
-        <div className="lg:col-span-7 bg-gray-900/60 rounded-xl p-4">
-          <h3 className="text-lg font-semibold text-white mb-4">AI-Powered Recommendations</h3>
-          
-          <div className="space-y-3">
-            {getRecommendations().map((rec, index) => (
-              <div 
-                key={index} 
-                className="bg-gray-800/50 rounded-lg p-3 border-l-4 border-violet-500"
+        {/* Asset Performance */}
+        <div className="bg-gray-800 rounded-lg p-4 mt-4">
+          <h3 className="text-lg font-semibold text-white mb-3">Asset Performance</h3>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={portfolioData.assetPerformance}
+                layout="vertical"
+                margin={{ top: 5, right: 30, left: 60, bottom: 5 }}
               >
-                <div className="flex justify-between items-center mb-1">
-                  <div className="font-medium text-white">{rec.asset}</div>
-                  <div className={`text-sm font-medium ${
-                    rec.action === "Increase" ? "text-green-400" : 
-                    rec.action === "Decrease" ? "text-red-400" : "text-blue-400"
-                  }`}>
-                    {rec.action} {rec.amount}
-                  </div>
-                </div>
-                <div className="text-sm text-gray-400">{rec.reason}</div>
+                <XAxis type="number" domain={['dataMin', 'dataMax']} tick={{fill: '#ccc'}} />
+                <YAxis dataKey="name" type="category" tick={{fill: '#ccc'}} width={80} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                <Tooltip 
+                  contentStyle={{backgroundColor: '#333', borderColor: '#555'}} 
+                  formatter={(value: number) => `${value.toFixed(2)}%`}
+                />
+                <Bar dataKey="performance">
+                  {portfolioData.assetPerformance.map((entry: any, index: number) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={entry.performance >= 0 ? '#4ade80' : '#f87171'} 
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        
+        {/* Recommendations */}
+        <div className="bg-gray-800 rounded-lg p-4 mt-4">
+          <h3 className="text-lg font-semibold text-white mb-3">Recommendations</h3>
+          <div className="space-y-3">
+            {getRecommendations().map((recommendation, index) => (
+              <div key={index} className={`p-3 rounded-lg ${
+                recommendation.type === 'warning' ? 'bg-red-900/30' : 'bg-blue-900/30'
+              }`}>
+                <div className="font-medium text-white mb-1">{recommendation.title}</div>
+                <div className="text-sm text-gray-300">{recommendation.reason}</div>
               </div>
             ))}
-          </div>
-          
-          <div className="mt-6">
-            <h4 className="font-medium text-white mb-2">Asset Performance</h4>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={portfolioData.assetPerformance}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="name" stroke="#9CA3AF" />
-                  <YAxis stroke="#9CA3AF" />
-                  <Tooltip 
-                    formatter={(value: number) => [`${value > 0 ? '+' : ''}${value}%`, 'Performance']}
-                    contentStyle={{ 
-                      backgroundColor: "#1F2937", 
-                      borderColor: "#4B5563",
-                      color: "#F9FAFB"
-                    }}
-                  />
-                  <Bar 
-                    dataKey="performance" 
-                    name="Performance"
-                    radius={[4, 4, 0, 0]}
-                  >
-                    {portfolioData.assetPerformance.map((entry: any, index: number) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={entry.performance >= 0 ? '#10b981' : '#ef4444'} 
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {getRecommendations().length === 0 && (
+              <div className="text-gray-400 italic">Your portfolio is well-aligned with your selected risk profile.</div>
+            )}
           </div>
         </div>
       </div>
