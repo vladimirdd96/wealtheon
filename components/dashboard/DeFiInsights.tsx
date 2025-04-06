@@ -1,0 +1,526 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
+  ResponsiveContainer, PieChart, Pie, Cell, Legend
+} from "recharts";
+
+// Mock DeFi protocols data (in a real app, this would come from Moralis API)
+const defiProtocols = [
+  { 
+    id: "aave", 
+    name: "Aave", 
+    category: "Lending", 
+    chainId: "eth", 
+    tvl: 4200000000, 
+    apr: 4.32,
+    risk: "Low",
+    pools: [
+      { name: "USDC", apy: 3.89, tvl: 980000000, risk: "Low" },
+      { name: "ETH", apy: 2.31, tvl: 1200000000, risk: "Low" },
+      { name: "USDT", apy: 3.91, tvl: 875000000, risk: "Low" },
+      { name: "DAI", apy: 3.72, tvl: 560000000, risk: "Low" },
+    ]
+  },
+  { 
+    id: "curve", 
+    name: "Curve Finance", 
+    category: "DEX", 
+    chainId: "eth", 
+    tvl: 3100000000, 
+    apr: 5.87,
+    risk: "Low-Medium",
+    pools: [
+      { name: "3pool", apy: 4.51, tvl: 720000000, risk: "Low" },
+      { name: "stETH", apy: 6.82, tvl: 890000000, risk: "Medium" },
+      { name: "tricrypto", apy: 8.93, tvl: 430000000, risk: "Medium" },
+      { name: "sUSD", apy: 5.21, tvl: 350000000, risk: "Low-Medium" },
+    ]
+  },
+  { 
+    id: "raydium", 
+    name: "Raydium", 
+    category: "DEX", 
+    chainId: "sol", 
+    tvl: 180000000, 
+    apr: 11.54,
+    risk: "Medium",
+    pools: [
+      { name: "SOL-USDC", apy: 12.87, tvl: 38000000, risk: "Medium" },
+      { name: "RAY-USDC", apy: 18.32, tvl: 22000000, risk: "Medium-High" },
+      { name: "SOL-RAY", apy: 14.91, tvl: 16500000, risk: "Medium" },
+      { name: "USDT-USDC", apy: 5.64, tvl: 42000000, risk: "Low" },
+    ]
+  },
+  { 
+    id: "orca", 
+    name: "Orca", 
+    category: "DEX", 
+    chainId: "sol", 
+    tvl: 155000000, 
+    apr: 9.73,
+    risk: "Medium",
+    pools: [
+      { name: "SOL-USDC", apy: 10.54, tvl: 32000000, risk: "Medium" },
+      { name: "ETH-SOL", apy: 13.21, tvl: 18500000, risk: "Medium" },
+      { name: "ORCA-USDC", apy: 16.82, tvl: 12000000, risk: "Medium-High" },
+      { name: "USDT-USDC", apy: 4.98, tvl: 38000000, risk: "Low" },
+    ]
+  },
+  { 
+    id: "marinade", 
+    name: "Marinade Finance", 
+    category: "Staking", 
+    chainId: "sol", 
+    tvl: 220000000, 
+    apr: 6.51,
+    risk: "Low",
+    pools: [
+      { name: "mSOL", apy: 6.51, tvl: 220000000, risk: "Low" },
+    ]
+  },
+  { 
+    id: "lido", 
+    name: "Lido", 
+    category: "Staking", 
+    chainId: "eth", 
+    tvl: 12500000000, 
+    apr: 3.85,
+    risk: "Low",
+    pools: [
+      { name: "stETH", apy: 3.85, tvl: 12500000000, risk: "Low" },
+    ]
+  }
+];
+
+// Filter options
+const chainFilters = [
+  { id: "all", label: "All Chains" },
+  { id: "eth", label: "Ethereum" },
+  { id: "sol", label: "Solana" },
+];
+
+const categoryFilters = [
+  { id: "all", label: "All Categories" },
+  { id: "lending", label: "Lending" },
+  { id: "dex", label: "DEX" },
+  { id: "staking", label: "Staking" },
+];
+
+const riskFilters = [
+  { id: "all", label: "All Risks" },
+  { id: "low", label: "Low" },
+  { id: "medium", label: "Medium" },
+  { id: "high", label: "High" },
+];
+
+// Colors for charts
+const COLORS = ['#8b5cf6', '#6366f1', '#a855f7', '#ec4899', '#8b5cf6', '#6366f1'];
+
+export default function DeFiInsights() {
+  const [selectedChain, setSelectedChain] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedRisk, setSelectedRisk] = useState("all");
+  const [selectedProtocol, setSelectedProtocol] = useState(defiProtocols[0].id);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Filter the protocols based on selected filters
+  const filteredProtocols = defiProtocols.filter(protocol => {
+    const chainMatch = selectedChain === "all" || protocol.chainId === selectedChain;
+    const categoryMatch = selectedCategory === "all" || protocol.category.toLowerCase() === selectedCategory.toLowerCase();
+    const riskMatch = selectedRisk === "all" || protocol.risk.toLowerCase().includes(selectedRisk.toLowerCase());
+    return chainMatch && categoryMatch && riskMatch;
+  });
+  
+  // Get the currently selected protocol
+  const protocol = defiProtocols.find(p => p.id === selectedProtocol) || defiProtocols[0];
+  
+  // Prepare data for the comparison chart
+  const protocolComparisonData = filteredProtocols.map(p => ({
+    name: p.name,
+    tvl: p.tvl / 1000000000, // Convert to billions for display
+    apr: p.apr,
+  })).sort((a, b) => b.apr - a.apr).slice(0, 6); // Top 6 by APR
+  
+  // Format currency values
+  const formatCurrency = (value: number) => {
+    if (value >= 1000000000) {
+      return `$${(value / 1000000000).toFixed(2)}B`;
+    } else if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(2)}M`;
+    } else if (value >= 1000) {
+      return `$${(value / 1000).toFixed(2)}K`;
+    } else {
+      return `$${value.toFixed(2)}`;
+    }
+  };
+  
+  // Generate yield farming recommendations
+  const getYieldRecommendations = () => {
+    // In a real app, this would use AI to analyze the best opportunities based on user preferences
+    
+    // Filter to highest APY pools with reasonable risk
+    const highYieldPools = defiProtocols
+      .flatMap(protocol => 
+        protocol.pools.map(pool => ({
+          protocol: protocol.name,
+          chain: protocol.chainId,
+          pool: pool.name,
+          apy: pool.apy,
+          tvl: pool.tvl,
+          risk: pool.risk,
+        }))
+      )
+      .filter(pool => !pool.risk.toLowerCase().includes("high"))
+      .sort((a, b) => b.apy - a.apy)
+      .slice(0, 5);
+    
+    return highYieldPools;
+  };
+  
+  // Generate impermanent loss risk assessment
+  const getImpermanentLossRisk = (poolName: string) => {
+    // In a real app, this would calculate actual IL risk based on volatility data
+    if (poolName.includes("USDC") && poolName.includes("USDT")) {
+      return "Very Low";
+    } else if (poolName.includes("DAI") || poolName.includes("USD")) {
+      return "Low";
+    } else if (poolName.includes("ETH") || poolName.includes("SOL")) {
+      return "Medium";
+    } else {
+      return "Medium-High";
+    }
+  };
+  
+  // Loading state
+  if (loading) {
+    return (
+      <div className="p-8 flex justify-center items-center min-h-[500px]">
+        <div className="text-white text-lg">Loading DeFi data...</div>
+      </div>
+    );
+  }
+  
+  // Error state
+  if (error) {
+    return (
+      <div className="p-8 flex justify-center items-center min-h-[500px]">
+        <div className="text-red-400 text-lg">{error}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 md:p-8">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 mb-8">
+        {/* Chain Filter */}
+        <div className="flex">
+          <div className="bg-gray-900/70 p-2 rounded-lg">
+            <div className="text-gray-400 text-xs mb-1">Chain</div>
+            <div className="flex gap-1">
+              {chainFilters.map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => setSelectedChain(filter.id)}
+                  className={`px-3 py-1 rounded text-sm ${
+                    selectedChain === filter.id
+                      ? "bg-violet-600 text-white"
+                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {/* Category Filter */}
+        <div className="flex">
+          <div className="bg-gray-900/70 p-2 rounded-lg">
+            <div className="text-gray-400 text-xs mb-1">Category</div>
+            <div className="flex gap-1">
+              {categoryFilters.map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => setSelectedCategory(filter.id)}
+                  className={`px-3 py-1 rounded text-sm ${
+                    selectedCategory === filter.id
+                      ? "bg-violet-600 text-white"
+                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {/* Risk Filter */}
+        <div className="flex">
+          <div className="bg-gray-900/70 p-2 rounded-lg">
+            <div className="text-gray-400 text-xs mb-1">Risk</div>
+            <div className="flex gap-1">
+              {riskFilters.map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => setSelectedRisk(filter.id)}
+                  className={`px-3 py-1 rounded text-sm ${
+                    selectedRisk === filter.id
+                      ? "bg-violet-600 text-white"
+                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* Left Column - Protocol Comparison */}
+        <div>
+          {/* Protocol APR Comparison */}
+          <div className="bg-gray-900/60 rounded-xl p-4 mb-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Top DeFi Protocols by APR</h3>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={protocolComparisonData}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis type="number" domain={[0, 'dataMax + 2']} stroke="#9CA3AF" />
+                  <YAxis dataKey="name" type="category" width={80} stroke="#9CA3AF" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: "#1F2937", 
+                      borderColor: "#4B5563",
+                      color: "#F9FAFB",
+                    }}
+                    formatter={(value: number) => [`${value.toFixed(2)}%`, 'APR']}
+                  />
+                  <Bar 
+                    dataKey="apr" 
+                    fill="#8b5cf6" 
+                    radius={[0, 4, 4, 0]}
+                    label={{ 
+                      position: 'right', 
+                      fill: 'white',
+                      formatter: (value: any) => `${value.toFixed(2)}%` 
+                    }}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          
+          {/* Protocol TVL Distribution */}
+          <div className="bg-gray-900/60 rounded-xl p-4">
+            <h3 className="text-lg font-semibold text-white mb-4">TVL Distribution</h3>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={protocolComparisonData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="tvl"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {protocolComparisonData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: "#1F2937", 
+                      borderColor: "#4B5563",
+                      color: "#F9FAFB",
+                    }}
+                    formatter={(value: number) => [`$${value.toFixed(2)}B`, 'TVL']}
+                  />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+        
+        {/* Right Column - Yield Opportunities and Protocol Details */}
+        <div>
+          {/* Best Yield Opportunities */}
+          <div className="bg-gray-900/60 rounded-xl p-4 mb-6">
+            <h3 className="text-lg font-semibold text-white mb-4">AI-Recommended Yield Opportunities</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left text-gray-300">
+                <thead className="text-xs uppercase text-gray-400 border-b border-gray-700">
+                  <tr>
+                    <th className="px-4 py-3">Protocol</th>
+                    <th className="px-4 py-3">Pool</th>
+                    <th className="px-4 py-3">Chain</th>
+                    <th className="px-4 py-3 text-right">APY</th>
+                    <th className="px-4 py-3 text-right">TVL</th>
+                    <th className="px-4 py-3 text-right">Risk</th>
+                    <th className="px-4 py-3 text-right">IL Risk</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700">
+                  {getYieldRecommendations().map((recommendation, index) => (
+                    <motion.tr 
+                      key={index} 
+                      className="bg-gray-800/40 hover:bg-gray-800/80 transition-colors"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: index * 0.05 }}
+                    >
+                      <td className="px-4 py-3">{recommendation.protocol}</td>
+                      <td className="px-4 py-3">{recommendation.pool}</td>
+                      <td className="px-4 py-3 capitalize">{recommendation.chain}</td>
+                      <td className="px-4 py-3 text-right text-green-400 font-medium">
+                        {recommendation.apy.toFixed(2)}%
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatCurrency(recommendation.tvl)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className={`rounded px-2 py-1 text-xs ${
+                          recommendation.risk.toLowerCase().includes('low') 
+                            ? 'bg-green-900/50 text-green-300' 
+                            : recommendation.risk.toLowerCase().includes('medium')
+                            ? 'bg-yellow-900/50 text-yellow-300'
+                            : 'bg-red-900/50 text-red-300'
+                        }`}>
+                          {recommendation.risk}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className={`rounded px-2 py-1 text-xs ${
+                          getImpermanentLossRisk(recommendation.pool).toLowerCase().includes('low') 
+                            ? 'bg-green-900/50 text-green-300' 
+                            : getImpermanentLossRisk(recommendation.pool).toLowerCase().includes('medium')
+                            ? 'bg-yellow-900/50 text-yellow-300'
+                            : 'bg-red-900/50 text-red-300'
+                        }`}>
+                          {getImpermanentLossRisk(recommendation.pool)}
+                        </span>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          {/* Protocol Selector */}
+          <div className="mb-4">
+            <div className="text-gray-400 text-sm mb-2">Select Protocol for Details</div>
+            <div className="flex flex-wrap gap-2">
+              {filteredProtocols.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedProtocol(p.id)}
+                  className={`px-3 py-1 rounded text-sm ${
+                    selectedProtocol === p.id
+                      ? "bg-violet-600 text-white"
+                      : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                  }`}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Protocol Details */}
+          <div className="bg-gray-900/60 rounded-xl p-4">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-xl font-semibold text-white">{protocol.name}</h3>
+                <div className="text-gray-400 text-sm flex items-center gap-2">
+                  <span className="capitalize">{protocol.category}</span>
+                  <span>•</span>
+                  <span className="capitalize">{protocol.chainId === "eth" ? "Ethereum" : "Solana"}</span>
+                </div>
+              </div>
+              <div className="bg-gray-800 px-3 py-1 rounded text-sm">
+                <div className="text-gray-400">Risk Level</div>
+                <div className={`font-medium ${
+                  protocol.risk.toLowerCase().includes('low') 
+                    ? 'text-green-400' 
+                    : protocol.risk.toLowerCase().includes('medium')
+                    ? 'text-yellow-400'
+                    : 'text-red-400'
+                }`}>
+                  {protocol.risk}
+                </div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-gray-800/60 p-3 rounded-lg">
+                <div className="text-gray-400 text-sm">Total Value Locked</div>
+                <div className="text-xl font-semibold text-white">{formatCurrency(protocol.tvl)}</div>
+              </div>
+              <div className="bg-gray-800/60 p-3 rounded-lg">
+                <div className="text-gray-400 text-sm">Average APR</div>
+                <div className="text-xl font-semibold text-green-400">{protocol.apr.toFixed(2)}%</div>
+              </div>
+            </div>
+            
+            <div>
+              <h4 className="text-md font-medium text-white mb-3">Available Pools</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left text-gray-300">
+                  <thead className="text-xs uppercase text-gray-400 border-b border-gray-700">
+                    <tr>
+                      <th className="px-4 py-2">Pool</th>
+                      <th className="px-4 py-2 text-right">APY</th>
+                      <th className="px-4 py-2 text-right">TVL</th>
+                      <th className="px-4 py-2 text-right">Risk</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-700">
+                    {protocol.pools.map((pool, index) => (
+                      <tr key={index} className="bg-gray-800/20 hover:bg-gray-800/60 transition-colors">
+                        <td className="px-4 py-2">{pool.name}</td>
+                        <td className="px-4 py-2 text-right text-green-400 font-medium">
+                          {pool.apy.toFixed(2)}%
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          {formatCurrency(pool.tvl)}
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <span className={`rounded px-2 py-1 text-xs ${
+                            pool.risk.toLowerCase().includes('low') 
+                              ? 'bg-green-900/50 text-green-300' 
+                              : pool.risk.toLowerCase().includes('medium')
+                              ? 'bg-yellow-900/50 text-yellow-300'
+                              : 'bg-red-900/50 text-red-300'
+                          }`}>
+                            {pool.risk}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+} 
