@@ -1,19 +1,11 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/next"
-    }
-  ],
-  "env": {
-    "OPENAI_API_KEY": "@openai-api-key",
-    "NEXT_PUBLIC_MORALIS_API_KEY": "@moralis-api-key",
-    "NEXT_PUBLIC_SOLANA_RPC_ENDPOINT": "@solana-rpc-endpoint",
-    "SUPABASE_URL": "@supabase-url",
-    "SUPABASE_ANON_KEY": "@supabase-anon-key"
-  },
-  "buildCommand": "next build",
-  "devCommand": "next dev",
-  "installCommand": "npm install"
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "github": {
+    "enabled": true,
+    "silent": true
+  }
 } 
