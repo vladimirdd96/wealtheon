@@ -64,7 +64,7 @@ export function FAQPageContent() {
               Frequently Asked Questions
             </h1>
             <p className="text-xl text-gray-400 mb-8 max-w-3xl mx-auto">
-              Find answers to common questions about Wealtheon's AI-powered investment platform
+              Find answers to common questions about Wealtheon&apos;s AI-powered investment platform
             </p>
             
             {/* Search Component */}
@@ -170,7 +170,7 @@ export function FAQPageContent() {
               transition={{ duration: 0.5, delay: 0.6 }}
             >
               <p className="text-center text-gray-400">
-                Can't find what you're looking for?{" "}
+                Can&apos;t find what you&apos;re looking for?{" "}
                 <a href="#" className="text-violet-400 hover:text-violet-300 transition-colors">
                   Contact our support team
                 </a>
@@ -218,7 +218,7 @@ const faqs: FAQ[] = [
   },
   {
     question: "Who can use Wealtheon?",
-    answer: "Wealtheon is designed for both beginner and experienced crypto investors. Whether you're just starting your journey in the crypto space or you're a seasoned trader looking for advanced analytics, our platform offers valuable insights tailored to your level of expertise.",
+    answer: "Wealtheon is designed for both beginner and experienced crypto investors. Whether you&apos;re just starting your journey in the crypto space or you&apos;re a seasoned trader looking for advanced analytics, our platform offers valuable insights tailored to your level of expertise.",
     category: "general",
     linkText: "Learn more about our membership tiers",
     linkUrl: "/pricing"
@@ -227,19 +227,19 @@ const faqs: FAQ[] = [
   // Membership & Pricing
   {
     question: "What are the benefits of higher-tier memberships?",
-    answer: "Higher-tier memberships provide access to more advanced AI analysis, personalized investment recommendations, early insights on market trends, NFT rarity analysis, and DeFi yield optimization tools. You'll also receive more frequent updates and detailed reports tailored to your portfolio.",
+    answer: "Higher-tier memberships provide access to more advanced AI analysis, personalized investment recommendations, early insights on market trends, NFT rarity analysis, and DeFi yield optimization tools. You&apos;ll also receive more frequent updates and detailed reports tailored to your portfolio.",
     category: "membership",
     linkText: "View our pricing page for detailed comparisons",
     linkUrl: "/pricing"
   },
   {
     question: "How do I upgrade my membership tier?",
-    answer: "You can upgrade your membership by minting a higher-tier NFT directly on our platform. The NFT serves as your membership token and grants immediate access to all associated features once it's in your wallet.",
+    answer: "You can upgrade your membership by minting a higher-tier NFT directly on our platform. The NFT serves as your membership token and grants immediate access to all associated features once it&apos;s in your wallet.",
     category: "membership"
   },
   {
     question: "Are there any additional fees beyond the NFT purchase?",
-    answer: "No, the NFT purchase is a one-time cost that grants you lifetime access to the tier's features. There are no monthly or hidden fees. Future platform updates and enhancements will be available to all existing members within their respective tiers.",
+    answer: "No, the NFT purchase is a one-time cost that grants you lifetime access to the tier&apos;s features. There are no monthly or hidden fees. Future platform updates and enhancements will be available to all existing members within their respective tiers.",
     category: "membership"
   },
   {
@@ -260,8 +260,8 @@ const faqs: FAQ[] = [
     category: "platform"
   },
   {
-    question: "How accurate are Wealtheon's AI predictions?",
-    answer: "While no prediction system is perfect, Wealtheon's AI models are trained on vast amounts of historical data and continuously improved using advanced machine learning techniques. Our system aims to identify patterns and trends rather than making precise price predictions, helping you make more informed decisions.",
+    question: "How accurate are Wealtheon&apos;s AI predictions?",
+    answer: "While no prediction system is perfect, Wealtheon&apos;s AI models are trained on vast amounts of historical data and continuously improved using advanced machine learning techniques. Our system aims to identify patterns and trends rather than making precise price predictions, helping you make more informed decisions.",
     category: "platform"
   },
   {

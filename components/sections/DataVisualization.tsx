@@ -61,6 +61,39 @@ export function DataVisualization() {
           return result;
         };
         
+        // Function to get real-time data from CoinGecko
+        const getRealPriceData = async (coinId: string, count: number = 30): Promise<any[]> => {
+          try {
+            // Calculate date range (days ago from now)
+            const now = Math.floor(Date.now() / 1000);
+            const daysAgo = now - (count * 86400);
+            
+            // Use CoinGecko's market chart endpoint to get historical data
+            const response = await fetch(
+              `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart/range?vs_currency=usd&from=${daysAgo}&to=${now}`
+            );
+            
+            if (!response.ok) {
+              throw new Error(`CoinGecko API responded with status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            // Process the data into the format we need
+            return data.prices.map((item: [number, number]) => {
+              const date = new Date(item[0]);
+              return {
+                date: `${date.toLocaleString('default', { month: 'short' })} ${date.getDate()}`,
+                timestamp: Math.floor(date.getTime() / 1000),
+                close: item[1]
+              };
+            });
+          } catch (error) {
+            console.error(`Error fetching price data for ${coinId}:`, error);
+            throw error;
+          }
+        };
+        
         // Fetch price data for BTC, ETH, and SOL
         // We'll use Promise.allSettled to handle individual API failures
         const [
@@ -70,9 +103,9 @@ export function DataVisualization() {
           tokensResult, 
           sentimentResult
         ] = await Promise.allSettled([
-          getBitcoinPriceData({ limit: 30, timeframe: '1d' }).catch(() => generateMockPriceData(40000)),
-          getEthereumPriceData({ limit: 30, timeframe: '1d' }).catch(() => generateMockPriceData(2500)),
-          getSolanaPriceData({ limit: 30, timeframe: '1d' }).catch(() => generateMockPriceData(100)),
+          getBitcoinPriceData({ limit: 30, timeframe: '1d' }).catch(() => getRealPriceData('bitcoin')),
+          getEthereumPriceData({ limit: 30, timeframe: '1d' }).catch(() => getRealPriceData('ethereum')),
+          getSolanaPriceData({ limit: 30, timeframe: '1d' }).catch(() => getRealPriceData('solana')),
           getTopTokens(5).catch(() => [
             { symbol: 'BTC', name: 'Bitcoin', marketCap: '1200000000000' },
             { symbol: 'ETH', name: 'Ethereum', marketCap: '500000000000' },
@@ -90,9 +123,28 @@ export function DataVisualization() {
         ]);
         
         // Process BTC, ETH, SOL data for the line chart
-        const btcData = btcResult.status === 'fulfilled' ? btcResult.value : generateMockPriceData(40000);
-        const ethData = ethResult.status === 'fulfilled' ? ethResult.value : generateMockPriceData(2500);
-        const solData = solResult.status === 'fulfilled' ? solResult.value : generateMockPriceData(100);
+        let btcData, ethData, solData;
+        
+        try {
+          btcData = btcResult.status === 'fulfilled' ? btcResult.value : await getRealPriceData('bitcoin');
+        } catch (error) {
+          console.error("Failed to get Bitcoin data, using fallback:", error);
+          btcData = generateMockPriceData(40000);
+        }
+        
+        try {
+          ethData = ethResult.status === 'fulfilled' ? ethResult.value : await getRealPriceData('ethereum');
+        } catch (error) {
+          console.error("Failed to get Ethereum data, using fallback:", error);
+          ethData = generateMockPriceData(2500);
+        }
+        
+        try {
+          solData = solResult.status === 'fulfilled' ? solResult.value : await getRealPriceData('solana');
+        } catch (error) {
+          console.error("Failed to get Solana data, using fallback:", error);
+          solData = generateMockPriceData(100);
+        }
         
         // Create a combined dataset for all tokens
         const combinedData: MarketDataPoint[] = btcData.map((btcPoint, index) => {

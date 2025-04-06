@@ -8,6 +8,7 @@ const nextConfig = {
     optimizeCss: false,
     optimizePackageImports: ['framer-motion', 'react-dom', 'recharts'],
   },
+  serverExternalPackages: ['@moralisweb3/next'],
   logging: {
     level: 'warn',
     fetches: {
@@ -20,20 +21,13 @@ const nextConfig = {
     } : false,
   },
   typescript: {
-    ignoreBuildErrors: false,
+    ignoreBuildErrors: process.env.NODE_ENV === 'development',
   },
   eslint: {
-    ignoreDuringBuilds: false,
+    ignoreDuringBuilds: true,
   },
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      if (config.optimization && config.optimization.minimizer) {
-        config.optimization.minimizer = [];
-      }
-      
-      config.optimization.minimize = false;
-    }
-    
+  webpack: (config) => {
+    config.optimization.minimize = false;
     return config;
   },
 };

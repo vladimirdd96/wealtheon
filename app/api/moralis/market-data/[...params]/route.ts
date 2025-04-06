@@ -10,47 +10,15 @@ if (!Moralis.Core.isStarted) {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { params: string[] } }
-) {
+  { params }: { params: Promise<{ params: string[] }> }
+): Promise<Response> {
   try {
     const { searchParams } = new URL(request.url);
     
-    // Fix for Next.js 15+ - await the entire params object first
+    // Get path from params
     const awaitedParams = await params;
-    const path = Array.isArray(awaitedParams.params) ? awaitedParams.params.join('/') : '';
+    const path = awaitedParams.params.join('/');
     
-    // Mock data responses since Moralis API is not working correctly
-    // This allows the UI to function while API issues are resolved
-    
-    if (path.includes('btcusd/ohlc')) {
-      // Return mock BTC data
-      return Response.json(generateMockOHLCVData('BTC', 30000, 45000, parseInt(searchParams.get('limit') || '30')));
-    } 
-    else if (path.includes('ethusd/ohlc')) {
-      // Return mock ETH data
-      return Response.json(generateMockOHLCVData('ETH', 2000, 3500, parseInt(searchParams.get('limit') || '30')));
-    } 
-    else if (path.includes('solusd/ohlc')) {
-      // Return mock SOL data
-      return Response.json(generateMockOHLCVData('SOL', 80, 160, parseInt(searchParams.get('limit') || '30')));
-    } 
-    else if (path.includes('tokens/top')) {
-      // Return mock top tokens data
-      return Response.json({
-        tokens: [
-          { symbol: 'BTC', name: 'Bitcoin', marketCap: '1200000000000' },
-          { symbol: 'ETH', name: 'Ethereum', marketCap: '500000000000' },
-          { symbol: 'SOL', name: 'Solana', marketCap: '80000000000' },
-          { symbol: 'BNB', name: 'Binance Coin', marketCap: '70000000000' },
-          { symbol: 'ADA', name: 'Cardano', marketCap: '30000000000' }
-        ]
-      });
-    } 
-    else {
-      throw new Error(`Unsupported market data endpoint: ${path}`);
-    }
-    
-    /* Real API integration - commented out until Moralis API issues are resolved
     let endpoint = '';
     
     // Handle different endpoints for market data
@@ -92,54 +60,17 @@ export async function GET(
       },
     });
     
-    // Check response status before parsing JSON
-    if (!response.ok) {
-      // Handle error responses
-      const errorText = await response.text();
-      console.error('Moralis API returned an error:', response.status, errorText);
-      return Response.json({ error: `API Error: ${response.status}` }, { status: response.status });
-    }
-    
-    const data = await response.json();
-    return Response.json(data);
-    */
+    // Return the response directly to avoid any transformation issues
+    return response;
     
   } catch (error: any) {
     console.error('Moralis API error:', error);
-    return Response.json({ error: error.message || 'Failed to process request' }, { status: 500 });
+    return new Response(
+      JSON.stringify({ error: error.message || 'Failed to process request' }),
+      { 
+        status: 500, 
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
   }
-}
-
-// Helper function to generate mock OHLCV data
-function generateMockOHLCVData(symbol: string, minPrice: number, maxPrice: number, count: number) {
-  const currentDate = new Date();
-  const data = [];
-  
-  for (let i = 0; i < count; i++) {
-    const date = new Date();
-    date.setDate(currentDate.getDate() - (count - i - 1));
-    
-    // Generate price within range with some randomness but trending upward
-    const factor = i / count; // 0 to 1 factor for trending
-    const basePrice = minPrice + (maxPrice - minPrice) * factor;
-    const variation = (Math.random() - 0.3) * (maxPrice - minPrice) * 0.1;
-    const price = basePrice + variation;
-    
-    // Calculate high, low, open based on close price
-    const high = price * (1 + Math.random() * 0.05);
-    const low = price * (1 - Math.random() * 0.05);
-    const open = low + Math.random() * (high - low);
-    const volume = Math.floor(Math.random() * 100000) + 50000;
-    
-    data.push({
-      timestamp: Math.floor(date.getTime() / 1000),
-      open: open.toFixed(2),
-      high: high.toFixed(2),
-      low: low.toFixed(2),
-      close: price.toFixed(2),
-      volume: volume.toString()
-    });
-  }
-  
-  return data;
 } 

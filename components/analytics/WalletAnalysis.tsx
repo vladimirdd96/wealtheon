@@ -92,6 +92,44 @@ const WalletAnalysis = () => {
     return chartData;
   };
   
+  // Get token price from CoinGecko
+  const getTokenPrice = async (symbol: string): Promise<number> => {
+    try {
+      // Map common token symbols to CoinGecko IDs
+      const tokenIdMap: {[key: string]: string} = {
+        'SOL': 'solana',
+        'USDC': 'usd-coin',
+        'USDT': 'tether',
+        'ETH': 'ethereum',
+        'BTC': 'bitcoin',
+        'BONK': 'bonk',
+        'JTO': 'jito-dao',
+        'PYTH': 'pyth-network',
+        'RNDR': 'render-token',
+        'JUP': 'jupiter',
+        'WIF': 'dogwifhat'
+      };
+      
+      // Default to a small value for unknown tokens
+      if (!tokenIdMap[symbol]) {
+        return 0.01;
+      }
+      
+      const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${tokenIdMap[symbol]}&vs_currencies=usd`);
+      
+      if (!response.ok) {
+        console.error(`Failed to get price for ${symbol}`);
+        return 0.01; // Fallback value
+      }
+      
+      const data = await response.json();
+      return data[tokenIdMap[symbol]]?.usd || 0.01;
+    } catch (error) {
+      console.error(`Error fetching price for ${symbol}:`, error);
+      return 0.01; // Fallback value
+    }
+  };
+  
   const handleAnalyze = async () => {
     if (!walletAddress.trim()) {
       setError('Please enter a valid wallet address');
@@ -119,8 +157,8 @@ const WalletAnalysis = () => {
       // Calculate SOL balance as a number
       const solBalance = Number(balanceResponse.result.solana);
       
-      // Estimate SOL value (make API call in production)
-      const solPrice = 150; // Example price, replace with actual API call
+      // Get current SOL price from CoinGecko
+      const solPrice = await getTokenPrice('SOL');
       const solValue = solBalance * solPrice;
       
       // Create holdings array, starting with SOL
@@ -149,14 +187,14 @@ const WalletAnalysis = () => {
             address: mintAddress
           });
           
-          // Get token price (in production you would call getTokenPrice here)
-          // For simplicity, generate a random price
-          const tokenPrice = Math.random() * 10;
-          
-          // Calculate token amount with decimals
+          // Get token metadata
           const metadata = tokenResponse.result as unknown as TokenMetadata;
+          const symbol = metadata?.symbol || 'UNKNOWN';
           const decimals = Number(metadata?.decimals || 0);
           const tokenAmount = Number(token.amount) / (10 ** decimals);
+          
+          // Get real token price from CoinGecko if possible
+          const tokenPrice = await getTokenPrice(symbol);
           
           // Calculate value
           const tokenValue = tokenAmount * tokenPrice;
@@ -165,7 +203,7 @@ const WalletAnalysis = () => {
           // Add to holdings
           holdings.push({
             name: metadata?.name || 'Unknown Token',
-            symbol: metadata?.symbol || 'UNKNOWN',
+            symbol: symbol,
             amount: tokenAmount.toFixed(decimals > 9 ? 9 : decimals),
             value: tokenValue,
             logo: metadata?.logo,

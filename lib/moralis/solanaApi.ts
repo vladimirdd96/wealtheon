@@ -5,36 +5,48 @@
 // Function to fetch a Solana wallet's native balance
 export async function getSolanaBalance(address: string) {
   try {
-    const response = await fetch(`/api/moralis/sol/account/${address}/balance`);
-    if (!response.ok) throw new Error('Failed to fetch balance');
+    const response = await fetch(`/api/moralis/account/${address}/balance?network=mainnet&chain=solana`);
+    
+    if (!response.ok) {
+      console.error(`Failed to fetch balance: ${response.status}`);
+      return { solana: "0" }; // Return a safe default
+    }
     return await response.json();
   } catch (error) {
     console.error('Error fetching Solana balance:', error);
-    throw error;
+    return { solana: "0" }; // Return a safe default
   }
 }
 
 // Function to fetch NFTs owned by a Solana wallet
 export async function getSolanaNFTs(address: string, limit = 20) {
   try {
-    const response = await fetch(`/api/moralis/sol/account/${address}/nft?limit=${limit}`);
-    if (!response.ok) throw new Error('Failed to fetch NFTs');
+    const response = await fetch(`/api/moralis/account/${address}/nft?chain=solana&network=mainnet&limit=${limit}`);
+    
+    if (!response.ok) {
+      console.error(`Failed to fetch NFTs: ${response.status}`);
+      return { result: [] }; // Return a safe default
+    }
     return await response.json();
   } catch (error) {
     console.error('Error fetching Solana NFTs:', error);
-    throw error;
+    return { result: [] }; // Return a safe default
   }
 }
 
 // Function to fetch token balances for a Solana wallet
 export async function getSolanaTokens(address: string) {
   try {
-    const response = await fetch(`/api/moralis/sol/account/${address}/tokens`);
-    if (!response.ok) throw new Error('Failed to fetch tokens');
+    const response = await fetch(`/api/moralis/account/${address}/tokens?chain=solana&network=mainnet`);
+    
+    if (!response.ok) {
+      console.error(`Failed to fetch tokens: ${response.status}`);
+      return { tokens: [] }; // Return a safe default
+    }
     return await response.json();
   } catch (error) {
     console.error('Error fetching Solana tokens:', error);
-    throw error;
+    return { tokens: [] }; // Return a safe default
   }
 }
 

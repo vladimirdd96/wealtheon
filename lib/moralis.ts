@@ -14,14 +14,15 @@ export async function getTokenPriceData(params: {
   fromDate: number;
   toDate: number;
   timeframe?: string;
+  symbol?: string;
 }) {
   try {
-    const { address, chain = 'eth', fromDate, toDate, timeframe = '1d' } = params;
+    const { address, chain = 'eth', fromDate, toDate, timeframe = '1d', symbol } = params;
     
     // Call our API route which handles the data generation
-    const response = await fetch(
-      `/api/moralis/token-price?address=${address}&chain=${chain}&fromDate=${fromDate}&toDate=${toDate}&timeframe=${timeframe}`
-    );
+    const url = `/api/moralis/token-price?address=${address}&chain=${chain}&fromDate=${fromDate}&toDate=${toDate}&timeframe=${timeframe}${symbol ? `&symbol=${symbol}` : ''}`;
+    
+    const response = await fetch(url);
     
     if (!response.ok) {
       const errorData = await response.json();

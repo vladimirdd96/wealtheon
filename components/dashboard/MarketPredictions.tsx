@@ -67,31 +67,44 @@ export default function MarketPredictions() {
       
       // Calculate date ranges
       const currentTime = Math.floor(Date.now() / 1000);
-      const fromDate = currentTime - (selectedPeriod.days * 24 * 60 * 60);
+      const fromDateTimestamp = currentTime - (selectedPeriod.days * 24 * 60 * 60);
       
       // Fetch real data from Moralis API
       const data = await getTokenPriceData({
         address: assetAddress,
         chain: 'eth',
-        fromDate: fromDate,
+        fromDate: fromDateTimestamp,
         toDate: currentTime,
-        timeframe: selectedTimePeriod === '24h' ? '1h' : '1d'
+        timeframe: selectedTimePeriod === '24h' ? '1h' : '1d',
+        symbol: currentAsset.symbol
       });
       
-      if (!data || !data.result || !Array.isArray(data.result) || data.result.length === 0) {
+      let prices = [];
+      
+      // Handle different response formats
+      if (data?.result?.prices && Array.isArray(data.result.prices)) {
+        prices = data.result.prices;
+      } else if (data?.result && Array.isArray(data.result)) {
+        prices = data.result;
+      } else {
+        console.warn('Unexpected data format:', data);
+        throw new Error("No price data available for this asset");
+      }
+      
+      if (!prices || prices.length === 0) {
         throw new Error("No price data available for this asset");
       }
       
       // Transform API data to our format
-      const formattedPriceData = data.result.map((item: any) => ({
+      const formattedPriceData = prices.map((item: any) => ({
         date: new Date(item.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         timestamp: new Date(item.timestamp).getTime(),
-        price: parseFloat(item.usdPrice) || 0,
-        open: parseFloat(item.open) || parseFloat(item.usdPrice) || 0,
-        high: parseFloat(item.high) || parseFloat(item.usdPrice) * 1.01 || 0,
-        low: parseFloat(item.low) || parseFloat(item.usdPrice) * 0.99 || 0,
-        close: parseFloat(item.close) || parseFloat(item.usdPrice) || 0,
-        volume: parseFloat(item.volume) || parseFloat(item.usdPrice) * 1000000 || 0
+        price: parseFloat(item.price || item.usdPrice) || 0,
+        open: parseFloat(item.open) || parseFloat(item.price || item.usdPrice) || 0,
+        high: parseFloat(item.high) || parseFloat(item.price || item.usdPrice) * 1.01 || 0,
+        low: parseFloat(item.low) || parseFloat(item.price || item.usdPrice) * 0.99 || 0,
+        close: parseFloat(item.close) || parseFloat(item.price || item.usdPrice) || 0,
+        volume: parseFloat(item.volume) || parseFloat(item.price || item.usdPrice) * 1000000 || 0
       }));
       
       setPriceData(formattedPriceData);
