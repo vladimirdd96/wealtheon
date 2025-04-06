@@ -6,6 +6,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
   ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from "recharts";
+import { useDefiStore, useWalletStore } from "@/store";
+import { formatDefiPositionValue, calculateRiskLevel, estimatePositionAPY } from "@/lib/moralis/defiApi";
 
 // Mock DeFi protocols data (in a real app, this would come from Moralis API)
 const defiProtocols = [
@@ -257,448 +259,455 @@ const generatePools = (
 };
 
 export default function DeFiInsights() {
-  const [selectedChain, setSelectedChain] = useState("all");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedRisk, setSelectedRisk] = useState("all");
-  const [selectedProtocol, setSelectedProtocol] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [protocols, setProtocols] = useState<any[]>([]);
+  // State for filters
+  const [activeChain, setActiveChain] = useState("all");
+  const [activeCategory, setActiveCategory] = useState("all");
+  const [activeRisk, setActiveRisk] = useState("all");
+  const [selectedProtocol, setSelectedProtocol] = useState<string | null>(null);
   
-  // Fetch protocols on component mount
+  // Get wallet from wallet store
+  const { connected, publicKey } = useWalletStore();
+  
+  // Get DeFi data from DeFi store
+  const { 
+    isLoading, 
+    error, 
+    protocolSummary, 
+    positions,
+    totalValue,
+    fetchDefiSummary, 
+    fetchDefiPositions,
+    fetchDefiPositionsByProtocol
+  } = useDefiStore();
+
+  // Load DeFi data when wallet is connected
   useEffect(() => {
-    async function loadProtocols() {
-      try {
-        setLoading(true);
-        const data = await fetchDefiProtocols();
-        
-        if (data.length > 0) {
-          setProtocols(data);
-          setSelectedProtocol(data[0].id); // Select first protocol by default
-        } else {
-          setError("No DeFi protocols available");
-        }
-      } catch (err) {
-        console.error("Failed to load DeFi protocols:", err);
-        setError("Failed to load DeFi data. Please try again.");
-      } finally {
-        setLoading(false);
-      }
+    if (connected && publicKey) {
+      fetchDefiSummary(publicKey);
+      fetchDefiPositions(publicKey);
     }
-    
-    loadProtocols();
-  }, []);
-  
-  // Filter the protocols based on selected filters
-  const filteredProtocols = protocols.filter(protocol => {
-    const chainMatch = selectedChain === "all" || protocol.chainId === selectedChain;
-    const categoryMatch = selectedCategory === "all" || protocol.category.toLowerCase() === selectedCategory.toLowerCase();
-    const riskMatch = selectedRisk === "all" || protocol.risk.toLowerCase().includes(selectedRisk.toLowerCase());
-    return chainMatch && categoryMatch && riskMatch;
-  });
-  
-  // Get the currently selected protocol
-  const protocol = protocols.find(p => p.id === selectedProtocol) || (protocols.length > 0 ? protocols[0] : null);
-  
-  // Prepare data for the comparison chart
-  const protocolComparisonData = filteredProtocols.map(p => ({
-    name: p.name,
-    tvl: p.tvl / 1000000000, // Convert to billions for display
-    apr: p.apr,
-  })).sort((a, b) => b.apr - a.apr).slice(0, 6); // Top 6 by APR
-  
+  }, [connected, publicKey, fetchDefiSummary, fetchDefiPositions]);
+
+  // Load protocol-specific positions when a protocol is selected
+  useEffect(() => {
+    if (connected && publicKey && selectedProtocol) {
+      fetchDefiPositionsByProtocol(publicKey, selectedProtocol);
+    }
+  }, [connected, publicKey, selectedProtocol, fetchDefiPositionsByProtocol]);
+
   // Format currency values
   const formatCurrency = (value: number) => {
-    if (value >= 1000000000) {
-      return `$${(value / 1000000000).toFixed(2)}B`;
-    } else if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(2)}M`;
-    } else if (value >= 1000) {
-      return `$${(value / 1000).toFixed(2)}K`;
-    } else {
-      return `$${value.toFixed(2)}`;
-    }
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(value);
   };
-  
-  // Generate yield farming recommendations
+
+  // Filter protocols based on active filters
+  const filteredProtocols = protocolSummary
+    .filter(protocol => activeChain === "all" || protocol.chain === activeChain)
+    .filter(protocol => {
+      if (activeCategory === "all") return true;
+      const category = protocol.protocol.toLowerCase();
+      if (activeCategory === "lending" && (category.includes("aave") || category.includes("compound"))) return true;
+      if (activeCategory === "dex" && (category.includes("uniswap") || category.includes("curve") || category.includes("sushi"))) return true;
+      if (activeCategory === "staking" && (category.includes("lido") || category.includes("staked"))) return true;
+      return false;
+    })
+    .filter(protocol => {
+      if (activeRisk === "all") return true;
+      const risk = calculateRiskLevel(protocol.protocol, protocol.positionValue);
+      return risk.toLowerCase() === activeRisk;
+    });
+
+  // Filter positions based on selected protocol
+  const filteredPositions = positions.filter(position => 
+    (!selectedProtocol || position.protocol === selectedProtocol) &&
+    (activeChain === "all" || position.chain === activeChain)
+  );
+
+  // Chart data for protocol distribution
+  const protocolChartData = filteredProtocols.map(protocol => ({
+    name: protocol.protocol,
+    value: protocol.positionValue,
+  }));
+
+  // Get yield recommendations
   const getYieldRecommendations = () => {
-    // In a real app, this would use AI to analyze the best opportunities based on user preferences
-    
-    // Filter to highest APY pools with reasonable risk
-    const highYieldPools = defiProtocols
-      .flatMap(protocol => 
-        protocol.pools.map(pool => ({
-          protocol: protocol.name,
-          chain: protocol.chainId,
-          pool: pool.name,
-          apy: pool.apy,
-          tvl: pool.tvl,
-          risk: pool.risk,
-        }))
-      )
-      .filter(pool => !pool.risk.toLowerCase().includes("high"))
-      .sort((a, b) => b.apy - a.apy)
-      .slice(0, 5);
-    
-    return highYieldPools;
+    // Sort positions by estimated APY
+    return filteredPositions
+      .map(position => ({
+        ...position,
+        estimatedApy: estimatePositionAPY(position.protocol, position.tokenSymbol.toLowerCase()),
+      }))
+      .sort((a, b) => b.estimatedApy - a.estimatedApy)
+      .slice(0, 3);
   };
-  
-  // Generate impermanent loss risk assessment
-  const getImpermanentLossRisk = (poolName: string) => {
-    // In a real app, this would calculate actual IL risk based on volatility data
-    if (poolName.includes("USDC") && poolName.includes("USDT")) {
-      return "Very Low";
-    } else if (poolName.includes("DAI") || poolName.includes("USD")) {
-      return "Low";
-    } else if (poolName.includes("ETH") || poolName.includes("SOL")) {
-      return "Medium";
-    } else {
-      return "Medium-High";
-    }
+
+  // Determine impermanent loss risk for LP positions
+  const getImpermanentLossRisk = (position: any) => {
+    if (!position.lpDetails) return 'N/A';
+    
+    // LP positions with volatile assets typically have higher IL risk
+    const volatilityScore = position.protocol.toLowerCase().includes('uniswap') ? 2 : 1;
+    const pairRisk = position.tokenSymbol.toLowerCase().includes('eth') ? 1.5 : 1;
+    
+    const score = volatilityScore * pairRisk;
+    
+    if (score > 2) return 'High';
+    if (score > 1.3) return 'Medium';
+    return 'Low';
   };
-  
+
   // Loading state
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="p-8 flex justify-center items-center min-h-[500px]">
-        <div className="text-white text-lg">Loading DeFi data...</div>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-6">
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">DeFi Insights</h2>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+        </div>
       </div>
     );
   }
-  
+
   // Error state
   if (error) {
     return (
-      <div className="p-8 flex justify-center items-center min-h-[500px]">
-        <div className="text-red-400 text-lg">{error}</div>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-6">
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">DeFi Insights</h2>
+        <div className="text-center p-6 text-red-500">
+          <p>{error}</p>
+          <button 
+            className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+            onClick={() => {
+              if (publicKey) {
+                fetchDefiSummary(publicKey);
+                fetchDefiPositions(publicKey);
+              }
+            }}
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Not connected state
+  if (!connected || !publicKey) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-6">
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">DeFi Insights</h2>
+        <div className="text-center p-6">
+          <p className="text-gray-600 dark:text-gray-400 mb-4">Connect your wallet to view your DeFi positions</p>
+          <button
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+          >
+            Connect Wallet
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // No data state
+  if (!Array.isArray(protocolSummary) || protocolSummary.length === 0) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-6">
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">DeFi Insights</h2>
+        <div className="text-center p-6">
+          <p className="text-gray-600 dark:text-gray-400 mb-1">No DeFi positions found</p>
+          <p className="text-gray-500 dark:text-gray-500 text-sm mb-4">
+            Your connected wallet doesn't have any DeFi positions we could detect
+          </p>
+          {publicKey && publicKey.startsWith('0x') && (
+            <button
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+              onClick={() => {
+                fetchDefiSummary(publicKey);
+                fetchDefiPositions(publicKey);
+              }}
+            >
+              Refresh Data
+            </button>
+          )}
+          {publicKey && !publicKey.startsWith('0x') && (
+            <p className="text-sm text-amber-500">
+              Note: DeFi data is currently only available for Ethereum wallets
+            </p>
+          )}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 md:p-8">
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-8">
-        {/* Chain Filter */}
-        <div className="flex">
-          <div className="bg-gray-900/70 p-2 rounded-lg">
-            <div className="text-gray-400 text-xs mb-1">Chain</div>
-            <div className="flex gap-1">
-              {chainFilters.map((filter) => (
-                <button
-                  key={filter.id}
-                  onClick={() => setSelectedChain(filter.id)}
-                  className={`px-3 py-1 rounded text-sm ${
-                    selectedChain === filter.id
-                      ? "bg-violet-600 text-white"
-                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-        
-        {/* Category Filter */}
-        <div className="flex">
-          <div className="bg-gray-900/70 p-2 rounded-lg">
-            <div className="text-gray-400 text-xs mb-1">Category</div>
-            <div className="flex gap-1">
-              {categoryFilters.map((filter) => (
-                <button
-                  key={filter.id}
-                  onClick={() => setSelectedCategory(filter.id)}
-                  className={`px-3 py-1 rounded text-sm ${
-                    selectedCategory === filter.id
-                      ? "bg-violet-600 text-white"
-                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-        
-        {/* Risk Filter */}
-        <div className="flex">
-          <div className="bg-gray-900/70 p-2 rounded-lg">
-            <div className="text-gray-400 text-xs mb-1">Risk</div>
-            <div className="flex gap-1">
-              {riskFilters.map((filter) => (
-                <button
-                  key={filter.id}
-                  onClick={() => setSelectedRisk(filter.id)}
-                  className={`px-3 py-1 rounded text-sm ${
-                    selectedRisk === filter.id
-                      ? "bg-violet-600 text-white"
-                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              ))}
-            </div>
-          </div>
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-6"
+    >
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">DeFi Insights</h2>
+        <div className="text-right">
+          <p className="text-sm text-gray-500 dark:text-gray-400">Total Value</p>
+          <p className="text-lg font-semibold text-gray-800 dark:text-gray-200">{formatCurrency(totalValue)}</p>
         </div>
       </div>
       
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Left Column - Protocol Comparison */}
-        <div>
-          {/* Protocol APR Comparison */}
-          <div className="bg-gray-900/60 rounded-xl p-4 mb-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Top DeFi Protocols by APR</h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={protocolComparisonData}
-                  layout="vertical"
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis type="number" domain={[0, 'dataMax + 2']} stroke="#9CA3AF" />
-                  <YAxis dataKey="name" type="category" width={80} stroke="#9CA3AF" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: "#1F2937", 
-                      borderColor: "#4B5563",
-                      color: "#F9FAFB",
-                    }}
-                    formatter={(value: number) => [`${value.toFixed(2)}%`, 'APR']}
-                  />
-                  <Bar 
-                    dataKey="apr" 
-                    fill="#8b5cf6" 
-                    radius={[0, 4, 4, 0]}
-                    label={{ 
-                      position: 'right', 
-                      fill: 'white',
-                      formatter: (value: any) => `${value.toFixed(2)}%` 
-                    }}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-          
-          {/* Protocol TVL Distribution */}
-          <div className="bg-gray-900/60 rounded-xl p-4">
-            <h3 className="text-lg font-semibold text-white mb-4">TVL Distribution</h3>
-            <div className="h-80">
+      {/* Filter pills */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        <div className="flex flex-wrap gap-2 mr-4">
+          {chainFilters.map((filter) => (
+            <button
+              key={filter.id}
+              className={`px-3 py-1 text-sm rounded-full transition ${
+                activeChain === filter.id
+                  ? "bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+              }`}
+              onClick={() => setActiveChain(filter.id)}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+        
+        <div className="flex flex-wrap gap-2 mr-4">
+          {categoryFilters.map((filter) => (
+            <button
+              key={filter.id}
+              className={`px-3 py-1 text-sm rounded-full transition ${
+                activeCategory === filter.id
+                  ? "bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+              }`}
+              onClick={() => setActiveCategory(filter.id)}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+        
+        <div className="flex flex-wrap gap-2">
+          {riskFilters.map((filter) => (
+            <button
+              key={filter.id}
+              className={`px-3 py-1 text-sm rounded-full transition ${
+                activeRisk === filter.id
+                  ? "bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+              }`}
+              onClick={() => setActiveRisk(filter.id)}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Protocol Distribution */}
+        <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+          <h3 className="text-md font-medium text-gray-800 dark:text-gray-200 mb-4">Protocol Distribution</h3>
+          {protocolChartData.length > 0 ? (
+            <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={protocolComparisonData}
+                    data={protocolChartData}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    outerRadius={100}
+                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                    outerRadius={80}
                     fill="#8884d8"
-                    dataKey="tvl"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    dataKey="value"
                   >
-                    {protocolComparisonData.map((entry, index) => (
+                    {protocolChartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: "#1F2937", 
-                      borderColor: "#4B5563",
-                      color: "#F9FAFB",
-                    }}
-                    formatter={(value: number) => [`$${value.toFixed(2)}B`, 'TVL']}
+                    formatter={(value: number) => formatCurrency(value)}
+                    labelFormatter={(name) => `Protocol: ${name}`}
                   />
-                  <Legend />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-          </div>
-        </div>
-        
-        {/* Right Column - Yield Opportunities and Protocol Details */}
-        <div>
-          {/* Best Yield Opportunities */}
-          <div className="bg-gray-900/60 rounded-xl p-4 mb-6">
-            <h3 className="text-lg font-semibold text-white mb-4">AI-Recommended Yield Opportunities</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left text-gray-300">
-                <thead className="text-xs uppercase text-gray-400 border-b border-gray-700">
-                  <tr>
-                    <th className="px-4 py-3">Protocol</th>
-                    <th className="px-4 py-3">Pool</th>
-                    <th className="px-4 py-3">Chain</th>
-                    <th className="px-4 py-3 text-right">APY</th>
-                    <th className="px-4 py-3 text-right">TVL</th>
-                    <th className="px-4 py-3 text-right">Risk</th>
-                    <th className="px-4 py-3 text-right">IL Risk</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700">
-                  {getYieldRecommendations().map((recommendation, index) => (
-                    <motion.tr 
-                      key={index} 
-                      className="bg-gray-800/40 hover:bg-gray-800/80 transition-colors"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: index * 0.05 }}
-                    >
-                      <td className="px-4 py-3">{recommendation.protocol}</td>
-                      <td className="px-4 py-3">{recommendation.pool}</td>
-                      <td className="px-4 py-3 capitalize">{recommendation.chain}</td>
-                      <td className="px-4 py-3 text-right text-green-400 font-medium">
-                        {recommendation.apy.toFixed(2)}%
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {formatCurrency(recommendation.tvl)}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={`rounded px-2 py-1 text-xs ${
-                          recommendation.risk.toLowerCase().includes('low') 
-                            ? 'bg-green-900/50 text-green-300' 
-                            : recommendation.risk.toLowerCase().includes('medium')
-                            ? 'bg-yellow-900/50 text-yellow-300'
-                            : 'bg-red-900/50 text-red-300'
-                        }`}>
-                          {recommendation.risk}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={`rounded px-2 py-1 text-xs ${
-                          getImpermanentLossRisk(recommendation.pool).toLowerCase().includes('low') 
-                            ? 'bg-green-900/50 text-green-300' 
-                            : getImpermanentLossRisk(recommendation.pool).toLowerCase().includes('medium')
-                            ? 'bg-yellow-900/50 text-yellow-300'
-                            : 'bg-red-900/50 text-red-300'
-                        }`}>
-                          {getImpermanentLossRisk(recommendation.pool)}
-                        </span>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
+          ) : (
+            <div className="h-64 flex items-center justify-center">
+              <p className="text-gray-500 dark:text-gray-400">No protocol data available</p>
             </div>
-          </div>
-          
-          {/* Protocol Selector */}
-          <div className="mb-4">
-            <div className="text-gray-400 text-sm mb-2">Select Protocol for Details</div>
-            <div className="flex flex-wrap gap-2">
-              {filteredProtocols.map((p) => (
+          )}
+          <div className="mt-4">
+            <div className="grid grid-cols-2 gap-2">
+              {filteredProtocols.slice(0, 4).map((protocol) => (
                 <button
-                  key={p.id}
-                  onClick={() => setSelectedProtocol(p.id)}
-                  className={`px-3 py-1 rounded text-sm ${
-                    selectedProtocol === p.id
-                      ? "bg-violet-600 text-white"
-                      : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                  key={protocol.protocol}
+                  className={`p-2 text-sm rounded-lg transition ${
+                    selectedProtocol === protocol.protocol
+                      ? "bg-purple-500 text-white"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-purple-800"
                   }`}
+                  onClick={() => setSelectedProtocol(
+                    selectedProtocol === protocol.protocol ? null : protocol.protocol
+                  )}
                 >
-                  {p.name}
+                  <div className="font-medium">{protocol.protocol}</div>
+                  <div className="text-xs opacity-80">{formatDefiPositionValue(protocol.positionValue)}</div>
                 </button>
               ))}
             </div>
           </div>
-          
-          {/* Protocol Details */}
-          <div className="bg-gray-900/60 rounded-xl p-4">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-xl font-semibold text-white">{protocol?.name}</h3>
-                <div className="text-gray-400 text-sm flex items-center gap-2">
-                  <span className="capitalize">{protocol?.category}</span>
-                  <span>•</span>
-                  <span className="capitalize">{protocol?.chainId === "eth" ? "Ethereum" : "Solana"}</span>
-                </div>
-              </div>
-              <div className="bg-gray-800 px-3 py-1 rounded text-sm">
-                <div className="text-gray-400">Risk Level</div>
-                <div className={`font-medium ${
-                  protocol?.risk.toLowerCase().includes('low') 
-                    ? 'text-green-400' 
-                    : protocol?.risk.toLowerCase().includes('medium')
-                    ? 'text-yellow-400'
-                    : 'text-red-400'
-                }`}>
-                  {protocol?.risk}
-                </div>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-gray-800/60 p-3 rounded-lg">
-                <div className="text-gray-400 text-sm">Total Value Locked</div>
-                <div className="text-xl font-semibold text-white">{formatCurrency(protocol?.tvl)}</div>
-              </div>
-              <div className="bg-gray-800/60 p-3 rounded-lg">
-                <div className="text-gray-400 text-sm">Average APR</div>
-                <div className="text-xl font-semibold text-green-400">{protocol?.apr.toFixed(2)}%</div>
-              </div>
-            </div>
-            
-            <div className="mt-8">
-              <div className="text-lg font-semibold text-white mb-3">Pools</div>
-              
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-700">
-                  <thead className="bg-gray-800/30">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Pool</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">APY</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">TVL</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Risk</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">IL Risk</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-700">
-                    {protocol?.pools.map((pool: {
-                      name: string;
-                      apy: number;
-                      tvl: number;
-                      risk: string;
-                    }, index: number) => (
-                      <tr key={index} className="bg-gray-800/20 hover:bg-gray-800/60 transition-colors">
-                        <td className="px-4 py-2">{pool.name}</td>
-                        <td className="px-4 py-2 text-green-400">{pool.apy.toFixed(2)}%</td>
-                        <td className="px-4 py-2">{formatCurrency(pool.tvl)}</td>
-                        <td className="px-4 py-2">
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            pool.risk.toLowerCase().includes('low') 
-                              ? 'bg-green-900/30 text-green-400' 
-                              : pool.risk.toLowerCase().includes('medium')
-                              ? 'bg-yellow-900/30 text-yellow-400'
-                              : 'bg-red-900/30 text-red-400'
-                          }`}>
-                            {pool.risk}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2">
-                          <span className="text-gray-300">
-                            {getImpermanentLossRisk(pool.name)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+        </div>
+        
+        {/* Positions */}
+        <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+          <h3 className="text-md font-medium text-gray-800 dark:text-gray-200 mb-4">
+            {selectedProtocol ? `${selectedProtocol} Positions` : 'DeFi Positions'}
+          </h3>
+          <div className="overflow-auto max-h-64">
+            {filteredPositions.length > 0 ? (
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-100 dark:bg-gray-800">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Token</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Value</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Est. APY</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Risk</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                  {filteredPositions.map((position, index) => {
+                    const estimatedApy = estimatePositionAPY(position.protocol, position.tokenSymbol.toLowerCase());
+                    const risk = calculateRiskLevel(position.protocol, position.balanceUsd);
                     
-                    {(!protocol || !protocol.pools || protocol.pools.length === 0) && (
-                      <tr>
-                        <td colSpan={5} className="px-4 py-3 text-center text-gray-400">
-                          No pool data available
+                    return (
+                      <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="ml-2">
+                              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{position.tokenSymbol}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">{position.protocol}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
+                          {formatCurrency(position.balanceUsd)}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
+                          {estimatedApy.toFixed(2)}%
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            risk === 'Low' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                            risk === 'Medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                            'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          }`}>
+                            {risk}
+                          </span>
                         </td>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <div className="h-32 flex items-center justify-center">
+                <p className="text-gray-500 dark:text-gray-400">
+                  {selectedProtocol ? 
+                    `No positions found for ${selectedProtocol}` : 
+                    'No positions data available'}
+                </p>
               </div>
-            </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Yield Opportunities */}
+        <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+          <h3 className="text-md font-medium text-gray-800 dark:text-gray-200 mb-4">Best Yield Opportunities</h3>
+          <div className="space-y-3">
+            {getYieldRecommendations().length > 0 ? (
+              getYieldRecommendations().map((position, idx) => (
+                <div key={idx} className="flex justify-between items-center p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+                  <div>
+                    <div className="font-medium text-gray-800 dark:text-gray-200">{position.tokenSymbol}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">{position.protocol}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-semibold text-green-600 dark:text-green-400">{position.estimatedApy.toFixed(2)}%</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">APY</div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="h-32 flex items-center justify-center">
+                <p className="text-gray-500 dark:text-gray-400">No yield opportunities available</p>
+              </div>
+            )}
+          </div>
+          <div className="mt-4 text-xs text-gray-500 dark:text-gray-400 text-right">
+            <p>APY estimates based on historical performance</p>
+          </div>
+        </div>
+        
+        {/* Risk Analysis */}
+        <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+          <h3 className="text-md font-medium text-gray-800 dark:text-gray-200 mb-4">Risk Analysis</h3>
+          <div className="overflow-auto max-h-64">
+            {filteredProtocols.length > 0 ? (
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-100 dark:bg-gray-800">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Protocol</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Risk Level</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Exposure</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                  {filteredProtocols.map((protocol, idx) => {
+                    const risk = calculateRiskLevel(protocol.protocol, protocol.positionValue);
+                    const exposure = (protocol.positionValue / totalValue) * 100;
+                    
+                    return (
+                      <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {protocol.protocol}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            risk === 'Low' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                            risk === 'Medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                            'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          }`}>
+                            {risk}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
+                          {exposure.toFixed(1)}%
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <div className="h-32 flex items-center justify-center">
+                <p className="text-gray-500 dark:text-gray-400">No risk data available</p>
+              </div>
+            )}
+          </div>
+          <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+            <p className="mb-1"><span className="inline-block w-3 h-3 bg-green-500 rounded-full mr-1"></span> Low: Well-established protocols with strong security track record</p>
+            <p className="mb-1"><span className="inline-block w-3 h-3 bg-yellow-500 rounded-full mr-1"></span> Medium: Known protocols with some risk factors</p>
+            <p><span className="inline-block w-3 h-3 bg-red-500 rounded-full mr-1"></span> High: New or experimental protocols with higher risk profile</p>
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 } 
