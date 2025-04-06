@@ -27,19 +27,19 @@ const initMoralis = async () => {
   }
 };
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { address: string } }
-) {
+// Simplified route handler with only one parameter
+export async function GET(request: NextRequest) {
   try {
     // Initialize Moralis
     await initMoralis();
     
-    // Extract wallet address from route parameter
-    const address = params.address;
-    const { searchParams } = new URL(request.url);
-    const network = searchParams.get('network') || 'mainnet';
-    const chain = searchParams.get('chain') || 'solana';
+    // Get the URL and extract address from the path
+    const url = new URL(request.url);
+    const pathParts = url.pathname.split('/');
+    // For path /api/moralis/account/[address]/portfolio, the address will be at position 4
+    const address = pathParts[4];
+    const network = url.searchParams.get('network') || 'mainnet';
+    const chain = url.searchParams.get('chain') || 'solana';
     
     if (!address) {
       return new Response(
