@@ -1,6 +1,6 @@
 "use client";
 import { useEffect } from 'react';
-import { useMarketDataStore } from '@/store';
+import { useMarketDataStore, useNFTStore } from '@/store';
 
 export function ZustandStoreProvider({
   children
@@ -10,11 +10,21 @@ export function ZustandStoreProvider({
   const { 
     fetchAllMarketData,
     fetchTokenPrices, 
-    isLoading, 
-    error,
-    clearError
+    isLoading: isLoadingMarketData, 
+    error: marketDataError,
+    clearError: clearMarketDataError
   } = useMarketDataStore();
 
+  const {
+    getTrendingCollections,
+    getNFTMarketData,
+    isLoadingTrending,
+    isLoadingMarketData: isLoadingNFTMarketData,
+    error: nftError,
+    clearError: clearNFTError
+  } = useNFTStore();
+
+  // Initialize market data
   useEffect(() => {
     // Add a slight delay before initializing to avoid API rate limits
     // and ensure the component is fully mounted
@@ -41,6 +51,27 @@ export function ZustandStoreProvider({
       // clearInterval(refreshInterval);
     };
   }, [fetchAllMarketData, fetchTokenPrices]);
+
+  // Initialize NFT data
+  useEffect(() => {
+    // Add a delay to avoid hitting API rate limits
+    const initNFTTimer = setTimeout(() => {
+      // Fetch trending collections
+      getTrendingCollections()
+        .then(() => {
+          // Then fetch NFT market data
+          setTimeout(() => getNFTMarketData(), 500);
+        })
+        .catch(err => {
+          console.error('Initial NFT data fetch error:', err);
+        });
+    }, 2000); // Start after market data initialization
+    
+    // Cleanup
+    return () => {
+      clearTimeout(initNFTTimer);
+    };
+  }, [getTrendingCollections, getNFTMarketData]);
 
   return children;
 } 

@@ -4,4 +4,5 @@ export { useMarketDataStore } from './marketDataStore';
 export type { PriceData, Token } from './marketDataStore';
 export { useDefiStore } from './defiStore';
 export { useWalletStore } from './walletStore';
-export { usePortfolioStore } from './portfolioStore'; 
+export { usePortfolioStore } from './portfolioStore';
+export { useNFTStore } from './nftStore'; 
