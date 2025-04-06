@@ -110,15 +110,15 @@ ISC
 
 ## Environment Variables
 
-The following environment variables are required:
+This application requires the following environment variables to be set in a `.env.local` file:
 
-- `OPENAI_API_KEY` - Your OpenAI API key for AI features
-- `NEXT_PUBLIC_MORALIS_API_KEY` - Your Moralis API key for blockchain data and wallet authentication
-- `NEXT_PUBLIC_SOLANA_RPC_ENDPOINT` - Your Solana RPC endpoint
-- `SUPABASE_URL` - Your Supabase project URL
-- `SUPABASE_ANON_KEY` - Your Supabase anonymous key
+1. Copy the example file to create your own environment file:
+   ```bash
+   cp .env.local.example .env.local
+   ```
 
-Copy `.env.example` to `.env` and fill in your values:
-```bash
-cp .env.example .env
-``` 
+2. Update the values in `.env.local` with your own API keys:
+   - `NEXT_PUBLIC_MORALIS_API_KEY` - Get from [Moralis](https://moralis.io)
+   - `NEXT_PUBLIC_OPENAI_API_KEY` - Get from [OpenAI](https://platform.openai.com/api-keys)
+
+These keys are essential for the analytics features to work properly. 

@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: false,
+  reactStrictMode: true,
   images: {
     unoptimized: true,
   },
@@ -10,6 +10,9 @@ const nextConfig = {
   },
   logging: {
     level: 'warn',
+    fetches: {
+      fullUrl: true,
+    },
   },
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? {
@@ -17,10 +20,10 @@ const nextConfig = {
     } : false,
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {

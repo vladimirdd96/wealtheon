@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 
 const tiers = [
   {
@@ -135,6 +136,36 @@ export function SubscriptionTiers() {
             </motion.div>
           ))}
         </div>
+
+        {/* View pricing details link */}
+        <motion.div 
+          className="text-center mt-12"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+        >
+          <Link 
+            href="/pricing#compare-features" 
+            className="inline-flex items-center text-violet-400 hover:text-violet-300 transition-colors"
+          >
+            <span className="font-medium">View detailed pricing comparison</span>
+            <svg 
+              className="ml-2 w-5 h-5" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24" 
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M14 5l7 7m0 0l-7 7m7-7H3"
+              />
+            </svg>
+          </Link>
+        </motion.div>
       </div>
     </section>
   );

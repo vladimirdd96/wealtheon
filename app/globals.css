@@ -271,4 +271,9 @@
   margin-left: auto !important;
   padding-right: 8px !important;
   flex-shrink: 0 !important;
+}
+
+/* Add scroll margin to section headings to account for fixed navbar */
+[id] {
+  scroll-margin-top: 90px; /* Adjust based on navbar height plus desired padding */
 } 
