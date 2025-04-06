@@ -57,7 +57,10 @@ export default function PersonalizedPortfolio() {
   
   // Fetch portfolio data (declaration moved up)
   const fetchPortfolioData = async (address: string) => {
-    setLoading(true);
+    // Only set loading if we don't already have data
+    if (!portfolioData) {
+      setLoading(true);
+    }
     
     try {
       // Generate mock portfolio data for demo
@@ -73,20 +76,28 @@ export default function PersonalizedPortfolio() {
   
   // Auto-connect wallet function (declared before useEffect call)
   const autoConnectWallet = useCallback(async () => {
-    setLoading(true);
+    // Don't set loading if we already have portfolioData to prevent UI flashing
+    if (!portfolioData) {
+      setLoading(true);
+    }
     
     try {
       // Simulate a wallet connection
       // In a real app, this would check for an existing wallet connection
-      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Simulated wallet address for demo
       const simulatedAddress = "FZLEgWgW6Li3zUeqYgChYmPpxfcRQiDjTU2y8hQFLQc8";
+      
+      // Set wallet connected first to avoid UI flashing
       setWalletAddress(simulatedAddress);
       setWalletConnected(true);
       
-      // Now fetch portfolio data
-      fetchPortfolioData(simulatedAddress);
+      // Use a separate loading indicator for data fetching
+      if (!portfolioData) {
+        // Generate mock portfolio data for demo
+        const mockPortfolioData = generateMockPortfolioData();
+        setPortfolioData(mockPortfolioData);
+      }
     } catch (err) {
       console.error("Failed to auto-connect wallet:", err);
       // Don't show an error for auto-connect failures
@@ -94,30 +105,38 @@ export default function PersonalizedPortfolio() {
     } finally {
       setLoading(false);
     }
-  }, [fetchPortfolioData]);
+  }, [portfolioData]);
   
   // Automatically connect wallet and fetch data when component mounts (moved after autoConnectWallet)
   useEffect(() => {
-    // Auto-connect wallet on load
-    autoConnectWallet();
+    // Auto-connect wallet on load - add a slight delay to ensure smooth mounting
+    const timer = setTimeout(() => {
+      autoConnectWallet();
+    }, 300);
+    
+    return () => clearTimeout(timer);
   }, [autoConnectWallet]);
   
   // Connect wallet function (for manual connection)
   const connectWallet = async () => {
     setLoading(true);
+    setError(null);
     
     try {
       // In a real app, this would use a wallet adapter like Phantom or WalletConnect
       // For demo purposes, we'll simulate a connection
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 800));
       
       // Simulated wallet address for demo
       const simulatedAddress = "FZLEgWgW6Li3zUeqYgChYmPpxfcRQiDjTU2y8hQFLQc8";
+      
+      // Set connected state first to avoid flashing
       setWalletAddress(simulatedAddress);
       setWalletConnected(true);
       
-      // Now fetch portfolio data
-      fetchPortfolioData(simulatedAddress);
+      // Then fetch portfolio data
+      const mockPortfolioData = generateMockPortfolioData();
+      setPortfolioData(mockPortfolioData);
     } catch (err) {
       console.error("Failed to connect wallet:", err);
       setError("Failed to connect your wallet. Please try again.");

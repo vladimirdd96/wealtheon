@@ -25,16 +25,28 @@ import dynamic from 'next/dynamic';
 const WalletProviderWrapper = dynamic(
   () => Promise.resolve(({ children, endpoint }: { children: React.ReactNode; endpoint: string }) => {
     // Initialize all the wallets you want to support
-    const wallets = useMemo(() => [
-      new PhantomWalletAdapter(),
-      new SolflareWalletAdapter(),
-      new CoinbaseWalletAdapter(),
-      new CloverWalletAdapter(),
-      new Coin98WalletAdapter(),
-      new LedgerWalletAdapter(),
-      new TorusWalletAdapter(),
-      new TrustWalletAdapter()
-    ], []);
+    const wallets = useMemo(() => {
+      try {
+        // Only create wallet adapters in browser environment
+        if (typeof window === 'undefined') {
+          return [];
+        }
+        
+        return [
+          new PhantomWalletAdapter(),
+          new SolflareWalletAdapter(),
+          new CoinbaseWalletAdapter(),
+          new CloverWalletAdapter(),
+          new Coin98WalletAdapter(),
+          new LedgerWalletAdapter(),
+          new TorusWalletAdapter(),
+          new TrustWalletAdapter()
+        ];
+      } catch (error) {
+        console.error('Error initializing wallet adapters:', error);
+        return [];
+      }
+    }, []);
 
     return (
       <ConnectionProvider endpoint={endpoint}>
