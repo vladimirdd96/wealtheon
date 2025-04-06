@@ -71,12 +71,15 @@ export function Features() {
           {features.map((feature, index) => (
             <motion.div
               key={index}
-              className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-xl p-6 shadow-lg hover:shadow-purple-500/10 transition-all duration-300 border border-gray-800 hover:border-purple-700/50"
+              className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-xl p-6 shadow-lg hover:shadow-purple-500/10 border border-gray-800 hover:border-purple-700/50"
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.1 * index }}
-              whileHover={{ y: -5 }}
+              whileHover={{ 
+                y: -5, 
+                transition: { duration: 0.2, ease: "easeOut" } 
+              }}
             >
               <div className="text-purple-500 mb-4">{feature.icon}</div>
               <h3 className="text-xl font-semibold text-white mb-2">{feature.title}</h3>

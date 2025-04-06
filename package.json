@@ -56,7 +56,8 @@
     "recharts": "^2.15.2",
     "simplex-noise": "^4.0.3",
     "tailwind-merge": "^3.1.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "zustand": "^5.0.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss7-compat": "^2.2.17",

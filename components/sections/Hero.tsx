@@ -2,8 +2,22 @@
 import React from "react";
 import { WavyBackground } from "@/components/ui/wavy-background";
 import { motion } from "framer-motion";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useWalletStore } from "@/store/walletStore";
 
 export function Hero() {
+  const { connected } = useWalletStore();
+  const { setVisible } = useWalletModal();
+
+  const handleGetStarted = () => {
+    // If connected, direct to dashboard, otherwise open wallet connect modal
+    if (connected) {
+      window.location.href = "/dashboard";
+    } else {
+      setVisible(true);
+    }
+  };
+
   return (
     <section className="relative w-full overflow-hidden">
       <WavyBackground 
@@ -50,8 +64,11 @@ export function Hero() {
             transition={{ duration: 0.6, delay: 0.4 }}
             className="mt-6"
           >
-            <button className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-semibold py-4 px-8 rounded-lg text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-purple-500/40">
-              Get Started
+            <button 
+              onClick={handleGetStarted}
+              className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-semibold py-4 px-8 rounded-lg text-lg transition-all duration-200 transform hover:scale-105 hover:shadow-lg hover:shadow-purple-500/40"
+            >
+              {connected ? "Go to Dashboard" : "Get Started"}
             </button>
           </motion.div>
         </div>

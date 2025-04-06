@@ -1,12 +1,63 @@
-import React from "react";
+"use client";
+import React, { useState, useEffect, useRef } from "react";
 import { Hero } from "@/components/sections/Hero";
 import { Features } from "@/components/sections/Features";
 import { DataVisualization } from "@/components/sections/DataVisualization";
 import { SubscriptionTiers } from "@/components/sections/SubscriptionTiers";
 import { CallToAction } from "@/components/sections/CallToAction";
+import { LoadingPage } from "@/components/ui/LoadingPage";
+import { useMarketDataStore } from "@/store";
 import Link from "next/link";
 
 export default function Home() {
+  const { isLoading, error, lastUpdated } = useMarketDataStore();
+  const [initialLoading, setInitialLoading] = useState(true);
+  const dataLoadedTimeRef = useRef<number | null>(null);
+  const MIN_LOADING_TIME = 2000; // 2 seconds minimum loading time
+  
+  // Check if all data is loaded to hide the loading page
+  useEffect(() => {
+    // Check if all the essential data has been loaded
+    const allDataLoaded = !isLoading.bitcoin && 
+                          !isLoading.ethereum && 
+                          !isLoading.solana && 
+                          !isLoading.tokenPrices;
+    
+    // When all data is loaded, record the time
+    if (allDataLoaded && !dataLoadedTimeRef.current) {
+      dataLoadedTimeRef.current = Date.now();
+    }
+    
+    // If we have recorded when data loaded, calculate the remaining time to display the loader
+    if (dataLoadedTimeRef.current) {
+      const elapsedTime = Date.now() - dataLoadedTimeRef.current;
+      const remainingTime = Math.max(0, MIN_LOADING_TIME - elapsedTime);
+      
+      const timer = setTimeout(() => {
+        setInitialLoading(false);
+      }, remainingTime);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
+  
+  // Reset loading state when user navigates back to this page
+  useEffect(() => {
+    // Reset the loading state when component mounts
+    setInitialLoading(true);
+    dataLoadedTimeRef.current = null;
+    
+    // Cleanup when component unmounts
+    return () => {
+      dataLoadedTimeRef.current = null;
+    };
+  }, []);
+  
+  // Show loading page during initial data load
+  if (initialLoading) {
+    return <LoadingPage />;
+  }
+
   return (
     <>
       <Hero />

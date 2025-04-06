@@ -80,6 +80,12 @@ export async function GET(request: NextRequest) {
 
 // Helper functions
 
+// Helper to get the base URL for API calls
+function getBaseUrl() {
+  // Always use full URL for server components
+  return process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+}
+
 // Calculate portfolio value from data
 async function calculatePortfolioValue(balanceData: any, tokens: any[]) {
   let totalValue = 0;
@@ -91,7 +97,8 @@ async function calculatePortfolioValue(balanceData: any, tokens: any[]) {
     const solBalance = balanceData && balanceData.solana ? parseFloat(balanceData.solana) : 0;
     
     // Use our proxy to avoid CORS issues
-    const solPriceResponse = await fetch('/api/coingecko?endpoint=simple/price&ids=solana&vs_currencies=usd');
+    const baseUrl = getBaseUrl();
+    const solPriceResponse = await fetch(`${baseUrl}/api/coingecko?endpoint=simple/price&ids=solana&vs_currencies=usd`);
     let solPrice = 0;
     
     if (solPriceResponse.ok) {
@@ -133,7 +140,8 @@ async function calculatePortfolioValue(balanceData: any, tokens: any[]) {
       const commonTokenPrices: Record<string, number> = {};
       
       try {
-        const priceResponse = await fetch(`/api/coingecko?endpoint=simple/price&ids=${commonTokens.join(',')}&vs_currencies=usd`);
+        const baseUrl = getBaseUrl();
+        const priceResponse = await fetch(`${baseUrl}/api/coingecko?endpoint=simple/price&ids=${commonTokens.join(',')}&vs_currencies=usd`);
         if (priceResponse.ok) {
           const priceData = await priceResponse.json();
           commonTokens.forEach(token => {

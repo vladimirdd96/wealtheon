@@ -1,8 +1,17 @@
 "use client";
 import React from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useWalletStore } from "@/store/walletStore";
 
 export function CallToAction() {
+  const { connected } = useWalletStore();
+  const { setVisible } = useWalletModal();
+  
+  // Hide the entire section if wallet is connected
+  if (connected) return null;
+
   return (
     <section className="relative py-20 overflow-hidden">
       {/* Background decorative elements */}
@@ -47,12 +56,18 @@ export function CallToAction() {
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.4 }}
           >
-            <button className="w-full sm:w-auto py-4 px-8 text-lg font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-purple-500/20">
+            <button 
+              onClick={() => setVisible(true)}
+              className="w-full sm:w-auto py-4 px-8 text-lg font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 rounded-lg transition-all duration-200 transform hover:scale-105 hover:shadow-lg hover:shadow-purple-500/20"
+            >
               Connect Wallet
             </button>
-            <button className="w-full sm:w-auto py-4 px-8 text-lg font-semibold text-gray-200 bg-gray-800 border border-gray-700 rounded-lg transition-all duration-300 transform hover:scale-105 hover:bg-gray-700">
+            <Link 
+              href="/pricing" 
+              className="w-full sm:w-auto py-4 px-8 text-lg font-semibold text-gray-200 bg-gray-800 border border-gray-700 rounded-lg transition-all duration-200 transform hover:scale-105 hover:bg-gray-700"
+            >
               Learn More
-            </button>
+            </Link>
           </motion.div>
         </div>
       </div>

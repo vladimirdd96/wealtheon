@@ -83,12 +83,16 @@ export function SubscriptionTiers() {
           {tiers.map((tier, index) => (
             <motion.div
               key={index}
-              className={`bg-gradient-to-b ${tier.bgGradient} rounded-2xl overflow-hidden border ${tier.borderColor} shadow-xl ${tier.hoverGlow} transition-all duration-500`}
+              className={`bg-gradient-to-b ${tier.bgGradient} rounded-2xl overflow-hidden border ${tier.borderColor} shadow-xl ${tier.hoverGlow}`}
               initial={{ opacity: 0, y: 50 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.1 * index }}
-              whileHover={{ y: -10, scale: 1.02 }}
+              whileHover={{ 
+                y: -10, 
+                scale: 1.02,
+                transition: { duration: 0.2, ease: "easeOut" }
+              }}
             >
               {tier.mostPopular && (
                 <div className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-center py-2 font-medium">
@@ -123,12 +127,13 @@ export function SubscriptionTiers() {
                 </div>
 
                 <button
-                  className={`w-full py-4 rounded-lg font-medium transition-all duration-300 transform hover:scale-105 
+                  className={`w-full py-4 rounded-lg font-medium hover:scale-105 
                     ${
                       tier.mostPopular
                         ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-700 hover:to-indigo-700"
                         : "bg-gray-800 text-white hover:bg-gray-700"
                     }`}
+                  style={{ transition: "all 0.2s ease-out" }}
                 >
                   Mint NFT
                 </button>
