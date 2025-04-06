@@ -67,7 +67,7 @@ export default function Dashboard() {
   const ActiveComponent = tabs.find((tab) => tab.id === activeTab)?.component || PersonalizedPortfolio;
 
   return (
-    <div className="bg-gray-950 min-h-screen text-white">
+    <div className="bg-gray-950 min-h-screen text-white mt-20">
       <div className="max-w-[1600px] mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-2">WealthX AI Dashboard</h1>
         <p className="text-gray-400 mb-8">AI-powered insights for your wealth management</p>

@@ -49,18 +49,18 @@ export function Navbar() {
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <div className="flex-shrink-0 flex items-center">
-            <span className="text-xl font-bold text-white">
+            <a className="text-xl font-bold text-white" href="/">
               WEALTHEON
-            </span>
+            </a>
           </div>
 
           {/* Desktop Navigation */}
           <div className="hidden md:block">
             <div className="ml-10 flex items-center space-x-8">
-              {["Features", "Analytics", "Pricing", "FAQ"].map((item) => (
+              {["Dashboard", "Analytics", "Pricing", "FAQ"].map((item) => (
                 <a
                   key={item}
-                  href={`#${item.toLowerCase()}`}
+                  href={`/${item.toLowerCase()}`}
                   className="text-gray-300 hover:text-white transition-colors duration-300"
                 >
                   {item}
