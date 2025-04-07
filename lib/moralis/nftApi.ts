@@ -333,8 +333,9 @@ export async function getTrendingCollections({
 
     const data = await response.json();
     
-    // The API returns data in our format
-    return data.result;
+    // The API returns collections directly, not inside a result property
+    // Make sure we always return an array even if the response is unexpected
+    return Array.isArray(data) ? data : (data.result || []);
   } catch (error) {
     console.error('Error getting trending NFT collections:', error);
     throw error;

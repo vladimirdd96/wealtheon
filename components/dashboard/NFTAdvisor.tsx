@@ -659,7 +659,7 @@ const TrendingCollections = ({
           <ArrowPathIcon className="h-5 w-5" />
           Try Again
         </button>
-      </div>
+        </div>
     );
   }
   
@@ -674,6 +674,27 @@ const TrendingCollections = ({
   // Get the currently selected collection
   const selectedCollectionData = collections.find((c: any) => c.address === selectedCollection) || collections[0];
   const priceHistoryData = selectedCollectionData?.priceHistory || [];
+  
+  // Calculate ownership concentration when selected collection changes
+  useEffect(() => {
+    if (selectedCollectionData) {
+      // Calculate ownership concentration
+      const concentration = 30; // Default value
+      
+      // If we have token count and unique owners data
+      if (selectedCollectionData.tokenCount && selectedCollectionData.uniqueOwners) {
+        const averagePerOwner = selectedCollectionData.tokenCount / selectedCollectionData.uniqueOwners;
+        // Simple calculation - more sophisticated metrics would be used in a real app
+        const calculatedConcentration = Math.min(80, Math.max(10, averagePerOwner * 10));
+        
+        // Save the calculated concentration to the collection data
+        selectedCollectionData.ownershipConcentration = Math.round(calculatedConcentration);
+      } else {
+        // Use default values if data is missing
+        selectedCollectionData.ownershipConcentration = concentration;
+      }
+    }
+  }, [selectedCollectionData]);
   
   // Risk level color and badge
   const getRiskBadge = (risk: string) => {

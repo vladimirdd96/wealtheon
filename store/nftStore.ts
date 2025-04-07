@@ -193,6 +193,27 @@ export const useNFTStore = create<NFTState>()(
             days
           });
           
+          // Check if collections is valid and has length
+          if (!collections || !Array.isArray(collections)) {
+            console.error('Error getting trending collections: Invalid response format');
+            set({ 
+              trendingCollections: [],
+              isLoadingTrending: false,
+              error: 'Failed to get trending collections: Invalid response format'
+            });
+            return;
+          }
+          
+          if (collections.length === 0) {
+            console.error('Error getting trending collections: No collections returned');
+            set({ 
+              trendingCollections: [],
+              isLoadingTrending: false,
+              error: 'No trending collections available at this time'
+            });
+            return;
+          }
+          
           set({ 
             trendingCollections: collections,
             // Select the first collection if none is selected
@@ -203,6 +224,7 @@ export const useNFTStore = create<NFTState>()(
           console.error('Error getting trending collections:', error);
           set({ 
             error: error instanceof Error ? error.message : 'Failed to get trending collections', 
+            trendingCollections: [], // Set empty array instead of undefined to avoid length errors
             isLoadingTrending: false 
           });
         }

@@ -215,27 +215,53 @@ export async function GET(request: NextRequest) {
       }
       
       const collectionsData = await collectionsResponse.json();
-      const collections = collectionsData.result || [];
+      
+      // The API returns an array directly, not inside a result property
+      const collections = Array.isArray(collectionsData) ? collectionsData : [];
+      
+      // Log what we get from the API for debugging
+      console.log('Moralis API response:', collections.length, 'collections');
+      
+      if (collections.length === 0) {
+        console.log('No collections returned from API, using fallback data');
+        throw new Error('Empty collections data from API');
+      }
       
       // Transform the response to match our NFTCollection interface
       const transformedCollections = collections.map((collection: any) => ({
-        id: collection.token_address,
-        address: collection.token_address,
-        name: collection.name || 'Unknown Collection',
-        symbol: collection.contract_ticker_symbol || '',
+        id: collection.collection_address || collection.token_address,
+        address: collection.collection_address || collection.token_address,
+        name: collection.collection_title || collection.name || 'Unknown Collection',
+        symbol: collection.symbol || '',
         chain: chainInput,
-        totalSupply: parseInt(collection.contract_total_supply) || 0,
-        items: parseInt(collection.items) || 0,
-        owners: parseInt(collection.owners) || 0,
-        floorPrice: parseFloat(collection.floor_price_usd) / 1800, // Convert USD to approx ETH
-        volume24h: parseFloat(collection.volume_24h_usd) / 1800, // Convert USD to approx ETH
-        volume7d: parseFloat(collection.volume_7d_usd) / 1800, // Convert USD to approx ETH
-        priceChange24h: parseFloat(collection.all_time_price_change_percentage) || 0,
-        priceChange7d: parseFloat(collection.all_time_price_change_percentage) || 0, // Using all-time as 7d isn't directly available
-        marketCap: parseFloat(collection.market_cap_usd) / 1800, // Convert USD to approx ETH
-        ownershipConcentration: getOwnershipConcentration(parseInt(collection.owners), parseInt(collection.items)),
-        risk: getRiskAssessment(collection),
-        image: collection.logo_url || null
+        totalSupply: parseInt(collection.total_supply || '0') || 0,
+        items: parseInt(collection.items || '0') || 0,
+        owners: parseInt(collection.owners || '0') || 0,
+        floorPrice: parseFloat(collection.floor_price || collection.floor_price_usd || '0'),
+        volume24h: parseFloat(collection.volume_usd || '0'),
+        volume7d: parseFloat(collection.volume_7d || '0'),
+        priceChange24h: parseFloat(collection.floor_price_24hr_percent_change || collection.volume_24hr_percent_change || '0'),
+        priceChange7d: parseFloat(collection.floor_price_7d_percent_change || '0'),
+        marketCap: parseFloat(collection.market_cap_usd || '0'),
+        ownershipConcentration: 'Medium', // Default value since API may not provide this
+        risk: 'Medium', // Default value since API may not provide this
+        image: collection.collection_image || collection.logo_url || null,
+        // Add price history for charts - generate mock data for now but we can replace with real data later
+        priceHistory: Array.from({ length: 30 }, (_, i) => {
+          // Generate date for the last 30 days
+          const date = new Date();
+          date.setDate(date.getDate() - (30 - i));
+          
+          // Base price with some slight randomization
+          const basePrice = parseFloat(collection.floor_price || collection.floor_price_usd || '1') * (0.85 + (i / 30) * 0.3);
+          const variance = basePrice * 0.1; // 10% variance
+          const price = basePrice + (Math.random() * variance * 2 - variance);
+          
+          return {
+            date: date.toISOString().split('T')[0],
+            price: parseFloat(price.toFixed(4))
+          };
+        })
       }));
 
       return NextResponse.json(transformedCollections);
