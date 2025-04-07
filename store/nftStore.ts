@@ -42,6 +42,11 @@ interface NFTState {
   priceRange: string;
   chain: string;
   
+  // Solana Wallet NFTs
+  solanaWalletNFTs: Record<string, NFT[]>;
+  isLoadingSolanaWalletNFTs: boolean;
+  solanaWalletAddress: string | null;
+  
   // Actions
   searchNFTs: (query: string, chain?: string, limit?: number) => Promise<void>;
   getNFTDetails: (address: string, tokenId: string, chain?: string) => Promise<void>;
@@ -54,6 +59,11 @@ interface NFTState {
   setFilterParams: (params: { priceRange?: string; chain?: string }) => void;
   clearError: () => void;
   clearSearch: () => void;
+  
+  // Solana Wallet Actions
+  getSolanaWalletNFTs: (address: string) => Promise<void>;
+  setSolanaWalletAddress: (address: string | null) => void;
+  clearSolanaWalletNFTs: () => void;
 }
 
 const getNFTKey = (address: string, tokenId: string, chain: string = 'eth') => {
@@ -88,6 +98,11 @@ export const useNFTStore = create<NFTState>()(
       
       priceRange: 'all',
       chain: 'eth',
+      
+      // Solana Wallet NFTs initial state
+      solanaWalletNFTs: {},
+      isLoadingSolanaWalletNFTs: false,
+      solanaWalletAddress: null,
       
       // Search NFTs
       searchNFTs: async (query, chain = 'eth', limit = 10) => {
@@ -292,6 +307,84 @@ export const useNFTStore = create<NFTState>()(
           searchQuery: '',
           searchCursor: null
         });
+      },
+      
+      // Get Solana Wallet NFTs
+      getSolanaWalletNFTs: async (address) => {
+        if (!address) return;
+        
+        // If we already have the NFTs for this address and they're not too old, return
+        const existingNFTs = get().solanaWalletNFTs[address];
+        if (existingNFTs) {
+          const lastFetchTime = localStorage.getItem(`solana-nfts-${address}-timestamp`);
+          if (lastFetchTime && Date.now() - parseInt(lastFetchTime) < 5 * 60 * 1000) { // 5 minutes
+            return;
+          }
+        }
+        
+        set({ isLoadingSolanaWalletNFTs: true, error: null });
+        
+        try {
+          const response = await fetch(`/api/moralis/solana/nft/wallet?address=${address}`);
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch Solana wallet NFTs: ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          
+          // Transform Solana NFTs to match our NFT interface
+          const transformedNFTs = (data.result || []).map((nft: any) => {
+            const metadata = nft.metadata ? 
+              (typeof nft.metadata === 'string' ? JSON.parse(nft.metadata) : nft.metadata) : 
+              null;
+            
+            return {
+              tokenId: nft.mint,
+              tokenAddress: nft.associatedTokenAddress,
+              name: metadata?.name || nft.name || 'Unnamed NFT',
+              symbol: metadata?.symbol || nft.symbol,
+              metadata: metadata,
+              image: metadata?.image || metadata?.image_url || nft.uri,
+              chain: 'solana',
+              amount: nft.amount ? parseInt(nft.amount) : 1,
+              owner: address,
+              contractType: 'SPL',
+              tokenUri: nft.uri,
+            };
+          });
+          
+          // Store the NFTs and update timestamp
+          set(state => ({
+            solanaWalletNFTs: {
+              ...state.solanaWalletNFTs,
+              [address]: transformedNFTs
+            },
+            solanaWalletAddress: address,
+            isLoadingSolanaWalletNFTs: false
+          }));
+          
+          localStorage.setItem(`solana-nfts-${address}-timestamp`, Date.now().toString());
+        } catch (error) {
+          console.error('Error fetching Solana wallet NFTs:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to fetch Solana wallet NFTs',
+            isLoadingSolanaWalletNFTs: false
+          });
+        }
+      },
+      
+      // Set Solana wallet address
+      setSolanaWalletAddress: (address) => {
+        set({ solanaWalletAddress: address });
+      },
+      
+      // Clear Solana wallet NFTs
+      clearSolanaWalletNFTs: () => {
+        set({ 
+          solanaWalletNFTs: {},
+          solanaWalletAddress: null
+        });
       }
     }),
     {
@@ -309,6 +402,8 @@ export const useNFTStore = create<NFTState>()(
         searchLimit: state.searchLimit,
         priceRange: state.priceRange,
         chain: state.chain,
+        solanaWalletNFTs: state.solanaWalletNFTs,
+        solanaWalletAddress: state.solanaWalletAddress,
       }),
     }
   )

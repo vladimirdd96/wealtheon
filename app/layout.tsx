@@ -15,6 +15,9 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Wealtheon - AI-Powered Investment Platform",
   description: "AI-powered investment platform providing personalized advice and market forecasts for crypto, NFTs, and DeFi.",
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({

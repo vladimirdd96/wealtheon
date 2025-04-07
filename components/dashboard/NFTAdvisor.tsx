@@ -11,6 +11,8 @@ import Image from "next/image";
 import { MagnifyingGlassIcon, FunnelIcon, AdjustmentsHorizontalIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import { ArrowPathIcon, InformationCircleIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
 import { useNFTStore } from '@/store';
+import type { NFT } from '@/lib/moralis/nftApi';
+import { useWalletStore } from '@/store';
 
 // Proper type definitions for component props
 interface NFTMarketOverviewProps {
@@ -106,7 +108,12 @@ export default function NFTAdvisor() {
     selectNFT,
     selectCollection,
     setFilterParams,
-    clearError
+    clearError,
+    solanaWalletNFTs,
+    solanaWalletAddress,
+    isLoadingSolanaWalletNFTs,
+    getSolanaWalletNFTs,
+    setSolanaWalletAddress
   } = useNFTStore();
 
   // Local UI states
@@ -871,7 +878,7 @@ const TrendingCollections = ({
             <tbody className="divide-y divide-gray-800">
               {collections.map((collection: any, index: number) => (
                 <tr 
-                  key={collection.address} 
+                  key={`${collection.address}-${collection.tokenId || ''}-${index}`}
                   className={`hover:bg-gray-700 cursor-pointer transition ${
                     collection.address === selectedCollection ? 'bg-gray-700' : ''
                   }`}
@@ -1148,48 +1155,56 @@ const NFTDetails = ({ nft, chain }: NFTDetailsProps) => {
 };
 
 const WalletNFTs = () => {
-  const [walletAddress, setWalletAddress] = useState("");
-  const [walletNFTs, setWalletNFTs] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [searchAddress, setSearchAddress] = useState("");
   const [activeTab, setActiveTab] = useState<string>("nfts");
-  const { chain } = useNFTStore();
+  const [error, setError] = useState<string | null>(null);
   
-  // Handle wallet address input change
-  const handleWalletAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setWalletAddress(e.target.value);
+  // Get wallet connection state
+  const { connected, publicKey } = useWalletStore();
+  
+  // Get Solana NFT data and actions from store
+  const { 
+    solanaWalletNFTs,
+    solanaWalletAddress,
+    isLoadingSolanaWalletNFTs,
+    getSolanaWalletNFTs,
+    setSolanaWalletAddress,
+    clearError: clearNFTError
+  } = useNFTStore();
+  
+  // Load NFTs for connected wallet on mount and when wallet changes
+  useEffect(() => {
+    if (connected && publicKey) {
+      setSolanaWalletAddress(publicKey);
+      getSolanaWalletNFTs(publicKey);
+    }
+  }, [connected, publicKey]);
+  
+  // Handle search address input change
+  const handleSearchAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchAddress(e.target.value);
   };
   
   // Handle form submission to get wallet NFTs
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!walletAddress || !walletAddress.startsWith("0x")) {
-      setError("Please enter a valid Ethereum wallet address (starting with 0x)");
+    if (!searchAddress) {
+      setError("Please enter a Solana wallet address");
       return;
     }
     
+    // Clear any previous errors
     setError(null);
-    setIsLoading(true);
+    clearNFTError();
     
-    try {
-      // Use the actual API to get NFTs
-      const response = await fetch(`/api/moralis/nft/wallet?address=${walletAddress}&chain=${chain}&limit=50`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch wallet NFTs: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      setWalletNFTs(data.result || []);
-    } catch (err) {
-      console.error("Error fetching wallet NFTs:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch wallet NFTs");
-      setWalletNFTs([]);
-    } finally {
-      setIsLoading(false);
-    }
+    // Update wallet address in store and fetch NFTs
+    setSolanaWalletAddress(searchAddress);
+    await getSolanaWalletNFTs(searchAddress);
   };
+  
+  // Get the NFTs for the current wallet address
+  const currentWalletNFTs = solanaWalletAddress ? solanaWalletNFTs[solanaWalletAddress] || [] : [];
   
   // Tabs for different wallet-related NFT data
   const walletTabs = [
@@ -1200,29 +1215,40 @@ const WalletNFTs = () => {
   
   return (
     <div className="space-y-6">
-      <h3 className="text-xl font-bold text-white">Wallet NFTs</h3>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <h3 className="text-xl font-bold text-white">Solana Wallet NFTs</h3>
+        
+        {/* Connected Wallet Status */}
+        {connected && publicKey && (
+          <div className="bg-gray-800 px-4 py-2 rounded-lg flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-green-500"></div>
+            <span className="text-gray-400 text-sm">Connected: </span>
+            <span className="text-white font-medium">{`${publicKey.slice(0, 6)}...${publicKey.slice(-4)}`}</span>
+          </div>
+        )}
+      </div>
       
-      {/* Wallet Address Input */}
+      {/* Search Other Wallets */}
       <div className="bg-gray-800 rounded-lg p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">
-              Enter Ethereum Wallet Address
+              Search Other Wallet
             </label>
             <div className="flex">
               <input
                 type="text"
-                value={walletAddress}
-                onChange={handleWalletAddressChange}
-                placeholder="0x..."
+                value={searchAddress}
+                onChange={handleSearchAddressChange}
+                placeholder="Enter Solana address..."
                 className="flex-1 bg-gray-900 text-white px-4 py-2 rounded-l-lg border border-gray-700"
               />
               <button
                 type="submit"
                 className="bg-violet-600 hover:bg-violet-700 text-white font-medium px-6 py-2 rounded-r-lg"
-                disabled={isLoading}
+                disabled={isLoadingSolanaWalletNFTs}
               >
-                {isLoading ? "Loading..." : "Search"}
+                {isLoadingSolanaWalletNFTs ? "Loading..." : "Search"}
               </button>
             </div>
             {error && (
@@ -1233,9 +1259,9 @@ const WalletNFTs = () => {
       </div>
       
       {/* Wallet NFT Content */}
-      {isLoading ? (
+      {isLoadingSolanaWalletNFTs ? (
         renderLoading()
-      ) : walletNFTs.length > 0 ? (
+      ) : currentWalletNFTs.length > 0 ? (
         <div className="space-y-6">
           {/* Sub-Tabs Navigation */}
           <div className="border-b border-gray-800">
@@ -1259,16 +1285,16 @@ const WalletNFTs = () => {
           {/* Wallet NFTs Grid */}
           {activeTab === "nfts" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {walletNFTs.map((nft) => (
+              {currentWalletNFTs.map((nft: NFT) => (
                 <div 
                   key={`${nft.tokenAddress}-${nft.tokenId}`}
                   className="bg-gray-800 rounded-lg overflow-hidden hover:bg-gray-700 transition cursor-pointer"
                 >
                   {/* NFT Image */}
                   <div className="relative aspect-square bg-gray-900">
-                    {nft.metadata?.image ? (
+                    {nft.image ? (
                       <Image
-                        src={nft.metadata.image}
+                        src={nft.image}
                         alt={nft.name || 'NFT'}
                         fill
                         className="object-contain"
@@ -1276,107 +1302,54 @@ const WalletNFTs = () => {
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <PhotoIcon className="h-16 w-16 text-gray-700" />
-                </div>
+                      </div>
                     )}
-              </div>
-              
+                  </div>
+                  
                   {/* NFT Info */}
                   <div className="p-3">
                     <h5 className="text-white font-medium truncate">{nft.name || 'Unnamed NFT'}</h5>
                     <p className="text-gray-400 text-sm">{nft.symbol || ''}</p>
                     <div className="mt-2 flex justify-between items-center">
                       <span className="text-gray-400 text-xs">Token ID: {nft.tokenId}</span>
-                      <span className="bg-violet-900/30 text-violet-400 text-xs px-2 py-1 rounded">{nft.chain}</span>
-                </div>
-                </div>
+                      <span className="bg-violet-900/30 text-violet-400 text-xs px-2 py-1 rounded">Solana</span>
+                    </div>
                   </div>
-              ))}
                 </div>
+              ))}
+            </div>
           )}
           
           {/* Collections Tab */}
           {activeTab === "collections" && (
             <div className="bg-gray-800 rounded-lg p-8 text-center">
               <h4 className="text-xl text-white mb-2">NFT Collections</h4>
-              <p className="text-gray-400">This wallet contains NFTs from multiple collections.</p>
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gray-900 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <div className="w-12 h-12 rounded-lg bg-gray-800 mr-3"></div>
-                    <div>
-                      <h5 className="text-white font-medium">CryptoPunks</h5>
-                      <p className="text-gray-400 text-sm">PUNK • 3 items</p>
-                </div>
-              </div>
-            </div>
-                <div className="bg-gray-900 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <div className="w-12 h-12 rounded-lg bg-gray-800 mr-3"></div>
-                    <div>
-                      <h5 className="text-white font-medium">Bored Ape Yacht Club</h5>
-                      <p className="text-gray-400 text-sm">BAYC • 1 item</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <p className="text-gray-400">Collection view coming soon for Solana NFTs.</p>
             </div>
           )}
           
           {/* Transfers Tab */}
           {activeTab === "transfers" && (
-            <div className="bg-gray-800 rounded-lg overflow-hidden">
-              <div className="p-4 border-b border-gray-700">
-                <h4 className="text-white font-medium">Recent NFT Transfers</h4>
-                      </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-900">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-gray-400 font-medium">NFT</th>
-                      <th className="px-4 py-3 text-left text-gray-400 font-medium">From</th>
-                      <th className="px-4 py-3 text-left text-gray-400 font-medium">To</th>
-                      <th className="px-4 py-3 text-right text-gray-400 font-medium">Value</th>
-                      <th className="px-4 py-3 text-right text-gray-400 font-medium">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-800">
-                    {[1, 2, 3].map((i) => (
-                      <tr key={i} className="hover:bg-gray-700">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center">
-                            <div className="w-8 h-8 rounded bg-gray-900 mr-2"></div>
-                      <div>
-                              <div className="text-white">CryptoPunk #{i}</div>
-                              <div className="text-gray-400 text-xs">PUNK • ID: {i}</div>
-                      </div>
-                      </div>
-                        </td>
-                        <td className="px-4 py-3 text-gray-300">
-                          <div className="truncate max-w-[150px]">0x1234...5678</div>
-                        </td>
-                        <td className="px-4 py-3 text-gray-300">
-                          <div className="truncate max-w-[150px]">{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}</div>
-                        </td>
-                        <td className="px-4 py-3 text-right text-white">
-                          {(Math.random() * 10).toFixed(3)} ETH
-                        </td>
-                        <td className="px-4 py-3 text-right text-gray-300">
-                          {new Date(Date.now() - i * 86400000).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                    </div>
+            <div className="bg-gray-800 rounded-lg p-8 text-center">
+              <h4 className="text-xl text-white mb-2">NFT Transfers</h4>
+              <p className="text-gray-400">Transfer history coming soon for Solana NFTs.</p>
             </div>
           )}
+        </div>
+      ) : !connected && !searchAddress ? (
+        <div className="bg-gray-800 rounded-lg p-8 text-center">
+          <PhotoIcon className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+          <h4 className="text-xl font-medium text-white mb-2">No Wallet Connected</h4>
+          <p className="text-gray-400 max-w-md mx-auto">
+            Connect your Solana wallet to view your NFTs, or search for another wallet address above.
+          </p>
         </div>
       ) : (
         <div className="bg-gray-800 rounded-lg p-8 text-center">
           <PhotoIcon className="h-16 w-16 text-gray-600 mx-auto mb-4" />
           <h4 className="text-xl font-medium text-white mb-2">No NFTs Found</h4>
           <p className="text-gray-400 max-w-md mx-auto">
-            Enter a wallet address above to view owned NFTs, collections, and transfer history.
+            No NFTs found in this wallet. Try searching for a different wallet address.
           </p>
         </div>
       )}

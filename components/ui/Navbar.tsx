@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { StaticWalletButton } from "./WalletButton";
 import Link from 'next/link';
 import { WalletConnectButton } from './WalletConnectButton';
+import Image from 'next/image';
 
 // Create a client-side only wrapper for the WalletConnectButton
 const ClientWalletButton = dynamic(
@@ -54,8 +55,14 @@ export function Navbar() {
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <div className="flex-shrink-0 flex items-center">
-            <Link className="text-xl font-bold text-white" href="/">
-              WEALTHEON
+            <Link href="/" className="relative w-48 h-40">
+              <Image
+                src="/wealtheon_logo_transparent_fixed.png"
+                alt="Wealtheon"
+                fill
+                className="object-contain brightness-200"
+                priority
+              />
             </Link>
           </div>
 

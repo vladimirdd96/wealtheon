@@ -1,5 +1,7 @@
 "use client";
 import React from "react";
+import Image from 'next/image';
+import Link from 'next/link';
 
 export function Footer() {
   return (
@@ -8,9 +10,14 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Logo and description */}
           <div className="col-span-1 md:col-span-1">
-            <div className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-500 to-indigo-400 mb-4">
-              WEALTHEON
-            </div>
+            <Link href="/" className="relative w-52 h-40 block mb-4">
+              <Image
+                src="/wealtheon_logo_transparent_fixed.png"
+                alt="Wealtheon"
+                fill
+                className="object-contain brightness-200"
+              />
+            </Link>
             <p className="text-gray-400 text-sm">
               AI-powered investment platform for crypto, NFTs, and DeFi.
             </p>
